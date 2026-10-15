@@ -1,4 +1,4 @@
-# ddd · v0.4.0
+# ddd · v0.4.1
 
 **A headless drug-discovery intelligence company on one Mac.** No staff: six
 departments run as agents executing playbooks on a schedule or on request. The
@@ -20,7 +20,7 @@ Every release ships as `ddd-vX.Y.Z.tar.gz`. The same line installs the first
 time and upgrades later; data, `.venv` and `.env` are kept.
 
 ```
-cd ~/Downloads && tar -xzf ddd-v0.4.0.tar.gz && bash ddd-v0.4.0/install.sh && cd ~/Sites/ddd && ./serve.sh && git push
+cd ~/Downloads && tar -xzf ddd-v0.4.1.tar.gz && bash ddd-v0.4.1/install.sh && cd ~/Sites/ddd && ./serve.sh && git push
 ```
 
 ## The company
@@ -62,8 +62,12 @@ To reach it from claude.ai it must be public, so it needs a token:
    `DDD_MCP_PUBLIC_HOST=<hostname>` (e.g. `ddd-mcp.fueldeskpro.com`), then `./serve.sh`.
 2. Route that hostname to `http://localhost:47521` in your Cloudflare Tunnel.
 3. In claude.ai: Customize → Connectors → Add custom connector, URL
-   `https://<hostname>/mcp`, "No sign in", and a request header
-   `Authorization: Bearer <token>`.
+   `https://<hostname>/mcp/<token>`, Authentication "No sign in". (A request
+   header `Authorization: Bearer <token>` on `https://<hostname>/mcp` also works.)
+
+OAuth discovery paths return 404, so clients don't assume a sign-in. Every
+request is logged to `logs/mcp.log` with the token redacted and, when refused,
+the reason (no header, wrong value, and so on).
 
 The server refuses to start with a public host and no token. The web UI
 (47520) has no auth: keep it local.

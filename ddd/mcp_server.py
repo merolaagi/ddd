@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import hmac
 import os
+import time
 
 from mcp.server.mcpserver import MCPServer
 
@@ -230,22 +231,69 @@ def company_update_charter(update: dict) -> dict:
     return charter_mod.save(update)
 
 
-class _BearerGate:
-    """ASGI wrapper: when DDD_MCP_TOKEN is set, every request must send
-    'Authorization: Bearer <token>' (claude.ai custom connector -> Request headers)."""
+class _TokenGate:
+    """ASGI wrapper used when DDD_MCP_TOKEN is set. A request is let in if either
+    - its path is /mcp/<token> (the token is part of the connector URL), or
+    - it sends 'Authorization: Bearer <token>'.
+    OAuth discovery paths get 404 so clients don't assume a sign-in is needed.
+    Every request is logged with the token redacted, plus why it was refused."""
+
+    OAUTH_PATHS = ("/.well-known/oauth-protected-resource", "/.well-known/oauth-authorization-server",
+                   "/.well-known/openid-configuration", "/register", "/authorize", "/token")
 
     def __init__(self, app, token):
-        self.app, self.token = app, token.encode()
+        self.app, self.token = app, token
+        self.secret_prefix = f"/mcp/{token}"
+
+    @staticmethod
+    async def _reply(send, status, body):
+        await send({"type": "http.response.start", "status": status,
+                    "headers": [(b"content-type", b"application/json")]})
+        await send({"type": "http.response.body", "body": body})
+
+    def _log(self, scope, status, note=""):
+        client = (scope.get("client") or ("?", 0))[0]
+        path = scope.get("path", "").replace(self.token, "<token>")
+        print(f"{time.strftime('%H:%M:%S')} {client} {scope.get('method')} {path} -> {status}{' (' + note + ')' if note else ''}",
+              flush=True)
 
     async def __call__(self, scope, receive, send):
-        if scope["type"] == "http":
-            auth = dict(scope.get("headers") or []).get(b"authorization", b"")
-            if not hmac.compare_digest(auth, b"Bearer " + self.token):
-                await send({"type": "http.response.start", "status": 401,
-                            "headers": [(b"content-type", b"application/json")]})
-                await send({"type": "http.response.body", "body": b'{"error":"unauthorized"}'})
-                return
-        await self.app(scope, receive, send)
+        if scope["type"] != "http":
+            return await self.app(scope, receive, send)
+        path = scope.get("path", "")
+        if path.startswith(self.OAUTH_PATHS):
+            self._log(scope, 404, "no OAuth on this server")
+            return await self._reply(send, 404, b'{"error":"not found"}')
+
+        ok, how = False, ""
+        if path == self.secret_prefix or path.startswith(self.secret_prefix + "/"):
+            ok, how = True, "token in URL"
+            rest = path[len(self.secret_prefix):] or ""
+            scope = dict(scope, path="/mcp" + rest, raw_path=("/mcp" + rest).encode())
+        else:
+            auth = dict(scope.get("headers") or []).get(b"authorization", b"").decode("latin-1")
+            if hmac.compare_digest(auth.encode(), f"Bearer {self.token}".encode()):
+                ok, how = True, "bearer header"
+            elif not auth:
+                how = "no Authorization header and no token in URL"
+            elif not auth.startswith("Bearer "):
+                how = "Authorization header present but doesn't start with 'Bearer '"
+            elif path.startswith("/mcp/"):
+                how = "token in URL doesn't match"
+            else:
+                how = f"bearer token doesn't match (got {len(auth) - 7} chars, expected {len(self.token)})"
+        if not ok:
+            self._log(scope, 401, how)
+            return await self._reply(send, 401, b'{"error":"unauthorized"}')
+
+        status = {}
+
+        async def _send(msg):
+            if msg["type"] == "http.response.start":
+                status["code"] = msg["status"]
+            await send(msg)
+        await self.app(scope, receive, _send)
+        self._log(scope, status.get("code", "?"), how)
 
 
 def main():
@@ -264,8 +312,8 @@ def main():
             raise SystemExit("DDD_MCP_PUBLIC_HOST is set but DDD_MCP_TOKEN is empty: refusing to serve publicly without a token.")
     app = mcp.streamable_http_app(streamable_http_path="/mcp", transport_security=security)
     if token:
-        app = _BearerGate(app, token)
-    uvicorn.run(app, host="127.0.0.1", port=MCP_PORT, log_level="info")
+        app = _TokenGate(app, token)
+    uvicorn.run(app, host="127.0.0.1", port=MCP_PORT, log_level="info", access_log=not token)
 
 
 if __name__ == "__main__":
