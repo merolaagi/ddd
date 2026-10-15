@@ -1,4 +1,4 @@
-# ddd · v0.2.0
+# ddd · v0.2.1
 
 Headless drug discovery on one Mac: open benchmarks, a PrimeKG knowledge graph,
 an MCP agent layer, and a **Tools Armory** of on-demand tools. No paid API.
@@ -16,7 +16,7 @@ Every release ships as `ddd-vX.Y.Z.tar.gz`. The same line installs the first
 time and upgrades later; data, `.venv` and `.env` are kept.
 
 ```
-cd ~/Downloads && tar -xzf ddd-v0.2.0.tar.gz && bash ddd-v0.2.0/install.sh && cd ~/Sites/ddd && ./serve.sh && git push -u origin main
+cd ~/Downloads && tar -xzf ddd-v0.2.1.tar.gz && bash ddd-v0.2.1/install.sh && cd ~/Sites/ddd && ./serve.sh && git push -u origin main
 ```
 
 `install.sh` creates the venv, installs packages and headless Chromium,

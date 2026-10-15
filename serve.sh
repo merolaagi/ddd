@@ -13,6 +13,17 @@ sleep 1
 source .venv/bin/activate
 nohup python -m ddd.mcp_server > logs/mcp.log 2>&1 &
 nohup python -m uvicorn ddd.app:app --host 127.0.0.1 --port "$WEB" > logs/web.log 2>&1 &
-sleep 3
-if curl -fs "http://127.0.0.1:$WEB/api/info" > /dev/null; then echo "Web  : http://127.0.0.1:$WEB"; else echo "Web failed to start, see logs/web.log"; fi
+echo "Starting ddd (first start can take ~20s while Python compiles RDKit and scikit-learn) ..."
+ok=0
+for i in $(seq 1 45); do
+  if curl -fs "http://127.0.0.1:$WEB/api/info" > /dev/null; then ok=1; break; fi
+  if ! pgrep -f "uvicorn ddd.app:app" > /dev/null; then break; fi
+  sleep 1
+done
+if [ "$ok" = 1 ]; then
+  echo "Web  : http://127.0.0.1:$WEB"
+else
+  echo "Web failed to start. Last lines of logs/web.log:"
+  tail -25 logs/web.log
+fi
 echo "MCP  : http://127.0.0.1:$MCP/mcp  (log: logs/mcp.log)"
