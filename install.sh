@@ -5,6 +5,15 @@ DEST="${DDD_DEST:-$HOME/Sites/ddd}"
 REPO="${DDD_REPO:-merolaagi/ddd}"
 VERSION="$(cat "$SRC/VERSION")"
 mkdir -p "$DEST"
+if [ -d "$DEST/.git" ]; then
+  (cd "$SRC" && find . -type f ! -path "./.git/*" | sed 's|^\./||' | sort) > /tmp/ddd-release-files.$$
+  (cd "$DEST" && git ls-files) | while read -r f; do
+    if ! grep -qxF "$f" /tmp/ddd-release-files.$$; then
+      (cd "$DEST" && git rm -q --cached -- "$f" && rm -f -- "$f") && echo "Removed (no longer in release): $f"
+    fi
+  done
+  rm -f /tmp/ddd-release-files.$$
+fi
 (cd "$SRC" && tar --exclude ./.venv --exclude ./data --exclude ./logs --exclude ./.env --exclude ./.git -cf - .) | (cd "$DEST" && tar -xf -)
 cd "$DEST"
 chmod +x serve.sh install.sh
@@ -22,7 +31,7 @@ command -v npx > /dev/null || echo "Note: REA needs Node.js 22+ (brew install no
 if [ ! -d .git ]; then git init -q -b main; fi
 if ! git remote get-url origin > /dev/null 2>&1; then
   if command -v gh > /dev/null && gh auth status > /dev/null 2>&1; then
-    gh repo view "$REPO" > /dev/null 2>&1 || gh repo create "$REPO" --public --description "ddd: headless drug-discovery bench, knowledge graph, MCP agent layer and Tools Armory" > /dev/null
+    gh repo view "$REPO" > /dev/null 2>&1 || gh repo create "$REPO" --public --description "ddd: a headless drug-discovery intelligence company run by agents" > /dev/null
   fi
   git remote add origin "https://github.com/$REPO.git"
 fi

@@ -91,3 +91,28 @@ def disease_candidate_targets(disease: str, limit: int = 25):
         optional match (g)-[:REL]-(p:Phenotype)
         return g.name as gene, n_drugs, count(distinct p) as n_phenotypes
         order by n_drugs desc, n_phenotypes desc limit $limit""", disease=disease, limit=limit)
+
+
+def find_disease(name: str):
+    """Best Disease node for a free-text name: exact match first, then shortest containing match."""
+    rows = _q("""
+        match (d:Disease) where toLower(d.name) = toLower($name) return d.name as name limit 1""", name=name)
+    if rows:
+        return rows[0]["name"]
+    rows = _q("""
+        match (d:Disease) where toLower(d.name) contains toLower($name)
+        return d.name as name order by size(d.name) limit 1""", name=name)
+    return rows[0]["name"] if rows else None
+
+
+def gene_drugs(gene: str, limit: int = 8):
+    return [r["drug"] for r in _q("""
+        match (g:Gene) where g.name = $gene with g limit 1
+        match (g)-[:REL]-(d:Drug) return distinct d.name as drug limit $limit""", gene=gene, limit=limit)]
+
+
+def disease_drugs(disease: str, limit: int = 15):
+    return _q("""
+        match (d:Disease) where d.name = $disease with d limit 1
+        match (d)-[r:REL]-(x:Drug)
+        return x.name as drug, r.display as relation limit $limit""", disease=disease, limit=limit)

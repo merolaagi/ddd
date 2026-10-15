@@ -2,8 +2,11 @@
 from __future__ import annotations
 
 import base64
+import ipaddress
 import json
+import os
 import re
+import socket
 from collections import Counter
 from urllib.parse import urlparse
 
@@ -29,11 +32,28 @@ def _redact(path):
     return n
 
 
+def _public_only(url: str):
+    """Recon is for public pages. Refuse loopback/private/link-local targets so a
+    remote MCP caller can't use the Mac to browse the home network."""
+    if os.environ.get("DDD_ALLOW_PRIVATE") == "1":
+        return
+    host = urlparse(url).hostname or ""
+    try:
+        addrs = {ai[4][0] for ai in socket.getaddrinfo(host, None)}
+    except socket.gaierror as e:
+        raise ValueError(f"cannot resolve {host}") from e
+    for a in addrs:
+        ip = ipaddress.ip_address(a.split("%")[0])
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast:
+            raise ValueError(f"{host} resolves to a non-public address ({a}); recon only targets public pages")
+
+
 def capture(url: str, explore: bool = True, max_clicks: int = 15, scrolls: int = 6) -> dict:
     """Open URL in headless Chromium, optionally scroll and click tab-like controls,
     and save the full network log (bodies embedded) as HAR."""
     if not url.startswith(("http://", "https://")):
         raise ValueError("url must start with http(s)://")
+    _public_only(url)
     try:
         from playwright.sync_api import sync_playwright
     except ImportError as e:

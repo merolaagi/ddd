@@ -1,0 +1,146 @@
+[
+ {
+  "name": "Therapeutics Data Commons (TDC)",
+  "category": "Molecular property & ADMET",
+  "repo": "mims-harvard/TDC",
+  "url": "https://tdcommons.ai/",
+  "measures": "Curated datasets, splits and leaderboards across ADMET, drug-target interaction, generation and clinical tasks.",
+  "caveat": "Many ADMET sets are small; leaderboard gaps are often within seed-to-seed variance.",
+  "maintainer": "Huang et al. (Harvard)"
+ },
+ {
+  "name": "MoleculeNet",
+  "category": "Molecular property & ADMET",
+  "repo": "deepchem/deepchem",
+  "url": "https://moleculenet.org/",
+  "measures": "Classic property benchmarks (BBBP, ESOL, Lipophilicity, ClinTox, BACE, HIV, Tox21 and more).",
+  "caveat": "Widely criticised for invalid or duplicate structures, inconsistent labels and splits that vary between papers.",
+  "maintainer": "Wu et al. (Stanford)"
+ },
+ {
+  "name": "Open Graph Benchmark: molecules",
+  "category": "Molecular property & ADMET",
+  "repo": "snap-stanford/ogb",
+  "url": "https://ogb.stanford.edu/",
+  "measures": "ogbg-molhiv and ogbg-molpcba with fixed scaffold splits, evaluators and a public leaderboard.",
+  "caveat": "molhiv has few positives, so ranks swing with random seeds; leaderboard entries are self-reported.",
+  "maintainer": "Hu et al. (Stanford)"
+ },
+ {
+  "name": "Polaris",
+  "category": "Molecular property & ADMET",
+  "repo": "polaris-hub/polaris",
+  "url": "https://polarishub.io/",
+  "measures": "Hub of community-certified datasets and benchmarks with standard evaluation.",
+  "caveat": "Young ecosystem; dataset quality and certification depth vary by contributor.",
+  "maintainer": "Polaris consortium"
+ },
+ {
+  "name": "MoleculeACE",
+  "category": "Molecular property & ADMET",
+  "repo": "molML/MoleculeACE",
+  "url": "https://github.com/molML/MoleculeACE",
+  "measures": "Prediction on activity cliffs: near-identical molecules with very different potency across ChEMBL targets.",
+  "caveat": "Cliff definitions depend on similarity and potency thresholds; covers a fixed set of targets.",
+  "maintainer": "van Tilborg et al."
+ },
+ {
+  "name": "PoseBusters",
+  "category": "Docking & binding",
+  "repo": "maabuu/posebusters",
+  "url": "https://github.com/maabuu/posebusters",
+  "measures": "Physical and chemical plausibility checks for predicted protein-ligand poses, plus a held-out benchmark set.",
+  "caveat": "Plausible is not correct: passing checks says nothing about affinity, and the test set is modest in size.",
+  "maintainer": "Buttenschoen, Morris & Deane (Oxford)"
+ },
+ {
+  "name": "PDBbind / CASF",
+  "category": "Docking & binding",
+  "repo": "",
+  "url": "http://www.pdbbind.org.cn/",
+  "measures": "Experimental binding affinities for PDB complexes; CASF core sets for scoring, ranking, docking and screening power.",
+  "caveat": "Protein and ligand similarity between the general set and core set leaks information into many reported results.",
+  "maintainer": ""
+ },
+ {
+  "name": "DUD-E",
+  "category": "Docking & binding",
+  "repo": "",
+  "url": "https://dude.docking.org/",
+  "measures": "Actives and property-matched decoys for virtual-screening enrichment across ~100 targets.",
+  "caveat": "Decoy construction bias lets ML models separate actives from decoys without learning binding.",
+  "maintainer": ""
+ },
+ {
+  "name": "LIT-PCBA",
+  "category": "Docking & binding",
+  "repo": "",
+  "url": "https://drugdesign.unistra.fr/LIT-PCBA/",
+  "measures": "Virtual-screening sets built from PubChem confirmatory assays with true inactives.",
+  "caveat": "Very low active counts on several targets make enrichment metrics noisy.",
+  "maintainer": ""
+ },
+ {
+  "name": "GuacaMol",
+  "category": "Generative design",
+  "repo": "BenevolentAI/guacamol",
+  "url": "https://github.com/BenevolentAI/guacamol",
+  "measures": "Distribution-learning and goal-directed generation benchmarks.",
+  "caveat": "Many goal-directed tasks are saturated and can be gamed with unrealistic molecules.",
+  "maintainer": "Brown et al. (BenevolentAI)"
+ },
+ {
+  "name": "MOSES",
+  "category": "Generative design",
+  "repo": "molecularsets/moses",
+  "url": "https://github.com/molecularsets/moses",
+  "measures": "Distribution-learning metrics for generative models on a ZINC-derived set.",
+  "caveat": "Validity, uniqueness and novelty are near-saturated and say little about usefulness.",
+  "maintainer": "Polykovskiy et al."
+ },
+ {
+  "name": "USPTO-50k",
+  "category": "Retrosynthesis",
+  "repo": "",
+  "url": "https://doi.org/10.1021/acs.jcim.6b00564",
+  "measures": "Single-step retrosynthesis on ~50k patent reactions with reaction-class labels.",
+  "caveat": "Top-k exact match penalises valid alternative routes; atom-mapping artefacts remain.",
+  "maintainer": ""
+ },
+ {
+  "name": "PrimeKG",
+  "category": "Knowledge graph & targets",
+  "repo": "mims-harvard/PrimeKG",
+  "url": "https://zitniklab.hms.harvard.edu/projects/PrimeKG/",
+  "measures": "Precision-medicine knowledge graph of diseases, drugs, genes, phenotypes and pathways, used for target and repurposing tasks.",
+  "caveat": "A snapshot of its sources; link-prediction splits leak if reverse and duplicate edges aren't removed.",
+  "maintainer": "Chandak, Huang & Zitnik (Harvard)"
+ },
+ {
+  "name": "Hetionet",
+  "category": "Knowledge graph & targets",
+  "repo": "hetio/hetionet",
+  "url": "https://het.io/",
+  "measures": "Integrative network of 11 node types used for drug-repurposing prediction.",
+  "caveat": "Built in 2017 and not updated; newer drugs and associations are missing.",
+  "maintainer": "Himmelstein et al."
+ },
+ {
+  "name": "Insilico DDD Benchmarks (BaaS)",
+  "category": "Evaluation services",
+  "repo": "",
+  "url": "https://dddbench.insilico.com/",
+  "measures": "Commercial benchmark service: Drug Discovery Foundations task suite and end-to-end Drug Candidate Essentials.",
+  "caveat": "Items and scoring are proprietary and run server-side, so results can't be independently reproduced.",
+  "maintainer": "Insilico Medicine"
+ },
+ {
+  "name": "O3DC Benchmark Index",
+  "category": "Evaluation services",
+  "repo": "",
+  "url": "https://o3dc.org/",
+  "measures": "Community index of drug-discovery benchmarks with maintainers, repo activity and known caveats.",
+  "caveat": "Convened by Insilico, which also lists its own commercial products in the index.",
+  "maintainer": "Insilico Medicine (convenor)"
+ }
+]

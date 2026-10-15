@@ -1,12 +1,16 @@
-# ddd · v0.2.1
+# ddd · v0.4.0
 
-Headless drug discovery on one Mac: open benchmarks, a PrimeKG knowledge graph,
-an MCP agent layer, and a **Tools Armory** of on-demand tools. No paid API.
+**A headless drug-discovery intelligence company on one Mac.** No staff: six
+departments run as agents executing playbooks on a schedule or on request. The
+founder sets the charter and reads the reports. Claude can operate the company
+through MCP. No paid model APIs.
 
-| Part | Port |
+| Part | Where |
 |---|---|
-| Web UI + JSON API (`ddd/app.py`) | 47520 |
-| MCP server, streamable HTTP at `/mcp` (`ddd/mcp_server.py`) | 47521 |
+| HQ: charter, KPIs, departments, activity, schedules, open index | http://127.0.0.1:47520/ |
+| Lab: benchmarks, molecule tools, Tools Armory, KG explorer, programs, Virtual Cell | http://127.0.0.1:47520/lab |
+| Public page: leaderboard + open benchmark index (rebuilt by Publishing) | http://127.0.0.1:47520/public/ |
+| MCP server, streamable HTTP at `/mcp` | 127.0.0.1:47521 |
 | Neo4j with PrimeKG (optional) | 7687 |
 | Ollama local LLMs (optional) | 11434 |
 
@@ -16,33 +20,62 @@ Every release ships as `ddd-vX.Y.Z.tar.gz`. The same line installs the first
 time and upgrades later; data, `.venv` and `.env` are kept.
 
 ```
-cd ~/Downloads && tar -xzf ddd-v0.2.1.tar.gz && bash ddd-v0.2.1/install.sh && cd ~/Sites/ddd && ./serve.sh && git push -u origin main
+cd ~/Downloads && tar -xzf ddd-v0.4.0.tar.gz && bash ddd-v0.4.0/install.sh && cd ~/Sites/ddd && ./serve.sh && git push
 ```
 
-`install.sh` creates the venv, installs packages and headless Chromium,
-initialises git, creates `merolaagi/ddd` with `gh` if it is installed and
-signed in (otherwise create the empty repo once on github.com), and commits the
-release.
+## The company
+
+**Charter** (editable on HQ, saved to `data/company/charter.json`): mission,
+operating model, scope, non-goals, principles, the intelligence watchlist and
+the focus diseases.
+
+| Department | Agent | Playbooks |
+|---|---|---|
+| Intelligence | Scout | `intel_watchlist_sweep`: recon every watchlist page and diff against the last capture (new/removed endpoints, schema changes, redeploys) · `intel_recon {url}` |
+| Evaluation | Judge | `bench_full_sweep`: every task × every baseline (optionally every Ollama model), flags regressions |
+| Target Biology | Cartographer | `bio_target_dossier {disease}`: ranked targets, linked drugs and graph context from PrimeKG |
+| Chemistry | Triage | `chem_molecule_triage {smiles}`: properties, six baseline predictions, red flags |
+| Discovery Programs | Lead | `discovery_program {disease, molecules}`: Scout → Chemist → Evaluator → Curator, end to end |
+| Publishing | Herald | `pub_weekly_digest`: the week's runs, repo activity for the index, rebuilds the public page |
+
+Every run is recorded (status, params, trigger, agent log) and leaves a
+markdown report in `data/company/reports/`.
+
+**Standing schedule** (seeded on first start, editable on HQ, local time):
+watchlist sweep Mon 06:00, benchmark sweep Sun 03:00, digest Mon 08:00.
+Schedules fire while the server runs. Formats: `hourly`, `daily HH:MM`,
+`weekly mon HH:MM`.
+
+**Optional narrator:** set `DDD_NARRATOR=<ollama model>` in `.env` and every
+report gets a short executive summary written by that local model.
+
+## Operating it from Claude (no API spend)
+
+The MCP server exposes `company_overview`, `company_run`,
+`company_run_status`, `company_runs`, `company_report`, `company_schedule`,
+`company_update_charter`, plus the lower-level bench, KG, armory, index,
+program and Virtual Cell tools.
+
+To reach it from claude.ai it must be public, so it needs a token:
+
+1. In `~/Sites/ddd/.env` set `DDD_MCP_TOKEN=<long random string>` and
+   `DDD_MCP_PUBLIC_HOST=<hostname>` (e.g. `ddd-mcp.fueldeskpro.com`), then `./serve.sh`.
+2. Route that hostname to `http://localhost:47521` in your Cloudflare Tunnel.
+3. In claude.ai: Customize → Connectors → Add custom connector, URL
+   `https://<hostname>/mcp`, "No sign in", and a request header
+   `Authorization: Bearer <token>`.
+
+The server refuses to start with a public host and no token. The web UI
+(47520) has no auth: keep it local.
 
 ## Tools Armory
 
-Tools ddd pulls up when it needs them, from the UI, the API
-(`POST /api/armory/<tool>`) or MCP (`armory_list`, `armory_run`).
-
-| Tool | What it does |
-|---|---|
-| `site_recon` | HAR capture → summary → REA → markdown report, in one call |
-| `har_capture` | Load a public URL in headless Chromium, scroll, click tab-like controls (skips submit/join/sign-in style buttons), save HAR with cookies/auth redacted |
-| `har_summary` | Hosts, first-party JSON endpoints with inferred schemas, JS bundles with embedded-data hints, third-party calls, failed requests |
-| `har_payload` | Body of the first entry whose URL contains a substring |
-| `rea_inspect` | `rea inspect-web-network-capture <har> har --json` via npx (Node 22+); HARs over 30 MB are slimmed first |
-| `artifacts` | List captures, REA evidence and reports |
-
-Captures live in `data/armory/` and are git-ignored, so third-party content
-never lands in the public repo. Use recon on public pages only.
-
-To add a tool: write a function in `ddd/armory/`, register it in `TOOLS` in
-`ddd/armory/__init__.py`. UI, API and MCP pick it up automatically.
+On-demand tools behind the departments, from the Lab, the API
+(`POST /api/armory/<tool>`) or MCP (`armory_list`, `armory_run`):
+`site_recon`, `har_capture`, `har_summary`, `har_payload`, `rea_inspect`,
+`artifacts`. Captures stay in `data/armory/` (git-ignored). Recon refuses
+private, loopback and link-local addresses, so a remote caller can't use the
+Mac to browse your home network.
 
 ## Benchmarks
 
@@ -50,9 +83,19 @@ MoleculeNet sets (BBBP, ESOL, Lipophilicity, ClinTox, BACE, HIV) with a
 deterministic Bemis-Murcko scaffold split; `ogbg-molhiv` with OGB's official
 split after `pip install ogb`. Each task carries a known caveat. Scaffold
 splits test generalisation but are not decontamination; time-split tasks are
-planned.
+planned. Models: `rf`, `logreg` and `ollama:<name>` (zero-shot).
 
-Models: `rf`, `logreg` (fingerprint baselines) and `ollama:<name>` (zero-shot).
+## Open benchmark index
+
+16 curated public benchmarks and services plus the bench's own tasks, each
+with a known caveat. Add entries with `POST /api/index` (a real caveat is
+required); they're stored in `data/benchmark_index.json`.
+
+## Virtual Cell
+
+A six-scale scaffold (molecular → organism) with biological age as the
+conditioning variable. The molecular scale is live, the intracellular scale
+links to Fate Memory Lab, the rest are stubs with a fixed contract.
 
 ## Knowledge graph (optional)
 
@@ -65,8 +108,3 @@ brew services start neo4j
 Set `NEO4J_PASSWORD` in `~/Sites/ddd/.env`, then
 `.venv/bin/python scripts/load_primekg.py --download` and `./serve.sh`.
 PrimeKG: Chandak, Huang & Zitnik, *Scientific Data* 2023, doi:10.7910/DVN/IXA7BM.
-
-## Security
-
-Both servers bind to 127.0.0.1 with no auth. Don't route them through a
-public tunnel until a token check is added.

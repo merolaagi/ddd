@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ddd HQ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f4ef; --panel:#ffffff; --ink:#1b1f1c; --muted:#5f6a63; --line:#dedbd1;
+  --accent:#1f6f5c; --accent-soft:#e3efe9; --warn:#9a5b00; --warn-soft:#fbf1df; --bad:#a3322a; --bad-soft:#f8e4e1;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f1311; --panel:#161b18; --ink:#e7ece8; --muted:#94a199; --line:#2a322d;
+  --accent:#5cc3a4; --accent-soft:#18302a; --warn:#e2a64a; --warn-soft:#2c2416; --bad:#e2766c; --bad-soft:#341c19;}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "IBM Plex Sans",system-ui,sans-serif}
+.mono,code,input,select,textarea{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:13px}
+a{color:var(--accent)}
+.wrap{max-width:1240px;margin:auto;padding:0 24px}
+@media(max-width:700px){.wrap{padding:0 16px}}
+header.top{border-bottom:1px solid var(--line);background:var(--panel)}
+.bar{display:flex;align-items:center;gap:18px;min-height:56px;flex-wrap:wrap}
+.brand{font-weight:600;font-size:19px;letter-spacing:-.01em}
+.brand b{color:var(--accent)}
+nav{display:flex;gap:4px}
+nav a{padding:6px 10px;border-radius:6px;text-decoration:none;color:var(--muted);font-size:14px}
+nav a.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.pills{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}
+.pill{border:1px solid var(--line);border-radius:999px;padding:2px 9px;font-size:12px;color:var(--muted);white-space:nowrap}
+.pill.ok{border-color:var(--accent);color:var(--accent)}
+.hero{padding:28px 0 8px}
+.hero h1{font-family:"IBM Plex Serif",Georgia,serif;font-weight:500;font-size:30px;line-height:1.25;margin:0 0 8px;max-width:900px}
+.hero p{color:var(--muted);margin:0;max-width:900px}
+@media(max-width:520px){.hero h1{font-size:23px}}
+details.charter{margin-top:12px}
+details.charter summary{cursor:pointer;color:var(--accent);font-size:14px}
+.cgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:10px}
+@media(max-width:860px){.cgrid{grid-template-columns:1fr}}
+.cgrid h4{margin:0 0 4px;font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.cgrid ul{margin:0;padding-left:18px;font-size:14px}
+.kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;margin:22px 0}
+@media(max-width:960px){.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:520px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.kpi .v{font-size:24px;font-weight:600;font-variant-numeric:tabular-nums}
+.kpi .l{font-size:12px;color:var(--muted)}
+h2{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:28px 0 12px;font-weight:600}
+.depts{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px}
+.dept{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.dept .hd{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.dept h3{margin:0;font-size:17px}
+.agent{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--accent);background:var(--accent-soft);padding:2px 8px;border-radius:999px;white-space:nowrap}
+.dept p.m{margin:0;color:var(--muted);font-size:14px}
+.last{font-size:13px;border-top:1px dashed var(--line);padding-top:8px}
+.pbs{display:flex;flex-direction:column;gap:6px}
+.pb{border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.pb .row1{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.pb .t{font-weight:600;font-size:14px}
+.pb .d{font-size:12px;color:var(--muted);margin-top:2px}
+.pb form{display:none;margin-top:8px;gap:6px;flex-direction:column}
+.pb.open form{display:flex}
+.pb label{font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:3px}
+.pb label.ck{flex-direction:row;align-items:center;gap:6px}
+input,select,textarea{background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:7px 9px;width:100%;min-width:0}
+input[type=checkbox]{width:16px;height:16px;padding:0;accent-color:var(--accent);flex:0 0 auto}
+textarea{min-height:70px;resize:vertical}
+button{background:var(--accent);color:var(--panel);border:0;border-radius:6px;padding:7px 12px;font-weight:600;cursor:pointer;font-family:inherit;font-size:13px;white-space:nowrap}
+button.ghost{background:transparent;color:var(--accent);border:1px solid var(--accent)}
+button.small{padding:4px 9px;font-size:12px}
+button.link{background:none;color:var(--accent);padding:0;font-weight:500}
+.status{font-size:11px;font-weight:600;padding:1px 7px;border-radius:999px;text-transform:uppercase;letter-spacing:.04em}
+.s-done{background:var(--accent-soft);color:var(--accent)}
+.s-running{background:var(--warn-soft);color:var(--warn)}
+.s-error,.s-interrupted{background:var(--bad-soft);color:var(--bad)}
+.two{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:16px}
+@media(max-width:960px){.two{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;min-width:0}
+.feed{max-height:560px;overflow:auto}
+.run{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:8px 4px;border-bottom:1px solid var(--line);cursor:pointer}
+.run:hover,.run.sel{background:var(--accent-soft)}
+.run .n{font-size:14px;font-weight:500}
+.run .sub{font-size:12px;color:var(--muted)}
+.run .tm{font-size:12px;color:var(--muted);text-align:right;white-space:nowrap}
+.viewer{min-height:300px;max-height:720px;overflow:auto}
+.viewer .md{font-size:14px}
+.viewer .md table{border-collapse:collapse;font-size:13px;display:block;overflow-x:auto}
+.viewer .md td,.viewer .md th{border:1px solid var(--line);padding:4px 8px}
+.viewer .md pre{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:10px;overflow:auto;font-size:12px}
+.viewer .md code{font-size:12px}
+.viewer .md h3,.viewer .md h4,.viewer .md h5{margin:14px 0 6px}
+.viewer .md hr{border:0;border-top:1px solid var(--line)}
+.viewer .md blockquote{margin:6px 0;padding:4px 12px;border-left:3px solid var(--accent);color:var(--muted)}
+pre.log{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:10px;font-size:12px;max-height:220px;overflow:auto;white-space:pre-wrap}
+.muted{color:var(--muted)}
+table.t{width:100%;border-collapse:collapse;font-size:14px}
+table.t td,table.t th{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+table.t th{font-size:12px;color:var(--muted);font-weight:500}
+.scroll{overflow-x:auto}
+.addsched{display:grid;grid-template-columns:2fr 1.4fr 2fr auto;gap:8px;margin-top:12px}
+@media(max-width:760px){.addsched{grid-template-columns:1fr}}
+.idx{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.idx article{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.idx h3{margin:0;font-size:15px}
+.idx .cat{font-size:12px;color:var(--muted);margin:2px 0 6px}
+.idx .cav{background:var(--warn-soft);color:var(--warn);font-size:12px;padding:5px 8px;border-radius:6px;margin-top:6px}
+.idx p{margin:0;font-size:13px}
+footer{color:var(--muted);font-size:12px;padding:32px 0}
+.err{color:var(--bad)}
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap bar">
+  <div class="brand"><b>ddd</b> HQ</div>
+  <nav><a class="on" href="/">HQ</a><a href="/lab">Lab</a><a href="/public/" target="_blank">Public page</a></nav>
+  <div class="pills" id="pills"></div>
+</div></header>
+
+<div class="wrap">
+  <section class="hero">
+    <h1 id="mission">…</h1>
+    <p id="model"></p>
+    <details class="charter"><summary>Charter: scope, non-goals, principles, watchlist</summary>
+      <div class="cgrid" id="charterGrid"></div>
+      <details style="margin-top:12px"><summary class="muted" style="cursor:pointer;font-size:13px">Edit charter (JSON)</summary>
+        <textarea id="charterEdit" style="min-height:260px;margin-top:8px"></textarea>
+        <div style="margin-top:6px;display:flex;gap:8px;align-items:center"><button onclick="saveCharter()">Save charter</button><span id="charterMsg" class="muted" style="font-size:13px"></span></div>
+      </details>
+    </details>
+  </section>
+
+  <div class="kpis" id="kpis"></div>
+
+  <h2>Departments</h2>
+  <div class="depts" id="depts"></div>
+
+  <h2>Operations</h2>
+  <div class="two">
+    <div class="panel"><div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:14px">Activity</b><span class="muted" style="font-size:12px" id="feedNote"></span></div>
+      <div class="feed" id="feed"><p class="muted">No runs yet. Run a playbook above.</p></div></div>
+    <div class="panel viewer" id="viewer"><p class="muted">Select a run to read its report and log.</p></div>
+  </div>
+
+  <h2>Schedules</h2>
+  <div class="panel">
+    <div class="scroll"><table class="t" id="scheds"></table></div>
+    <div class="addsched">
+      <select id="sPlay"></select>
+      <input id="sEvery" placeholder="daily 07:00 · weekly mon 06:00 · hourly">
+      <input id="sParams" placeholder='params JSON, e.g. {"disease":"asthma"}'>
+      <button onclick="addSched()">Add schedule</button>
+    </div>
+    <p class="muted" style="font-size:12px;margin:8px 0 0">Times are local to the Mac. Schedules fire while the server is running.</p>
+  </div>
+
+  <h2>Open benchmark index</h2>
+  <p class="muted" style="margin:-4px 0 12px;font-size:14px">The Publishing department's product: every entry carries the caveat its own description leaves out. Repo activity refreshes with each weekly digest.</p>
+  <div class="idx" id="idx"></div>
+
+  <footer>ddd runs on this Mac. No paid model APIs. Predictions are research signals, not assay results.</footer>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const api = async (p, o) => { const r = await fetch(p, o); const ct = r.headers.get("content-type")||""; const b = ct.includes("json") ? await r.json() : await r.text(); if(!r.ok) throw new Error((b && b.detail) || r.status); return b; };
+const post = (p, body, method="POST") => api(p, {method, headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)});
+const ago = t => { if(!t) return "—"; const s = Date.now()/1000 - t; if(s < 60) return "just now"; if(s < 3600) return Math.floor(s/60)+"m ago"; if(s < 86400) return Math.floor(s/3600)+"h ago"; return Math.floor(s/86400)+"d ago"; };
+const when = t => t ? new Date(t*1000).toLocaleString([], {weekday:"short", month:"short", day:"numeric", hour:"2-digit", minute:"2-digit"}) : "—";
+const dur = r => r.finished && r.started ? Math.max(1, Math.round(r.finished - r.started)) + "s" : "";
+let OV = null, SEL = null, BOOKS = [];
+/* Minimal markdown for run reports. Every text fragment is escaped before any
+   tag is added, so content captured from other sites can't inject HTML. */
+function mdInline(t){
+  let h = esc(t);
+  h = h.replace(/`([^`]+)`/g, "<code>$1</code>");
+  h = h.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  h = h.replace(/(^|[\s(])_([^_]+)_(?=[\s).,]|$)/g, "$1<em>$2</em>");
+  return h;
+}
+function mdToHtml(md){
+  const L = md.split("\n"), out = [];
+  for(let i = 0; i < L.length; i++){
+    const line = L[i];
+    if(line.startsWith("```")){
+      const buf = []; i++;
+      while(i < L.length && !L[i].startsWith("```")) buf.push(L[i++]);
+      out.push(`<pre>${esc(buf.join("\n"))}</pre>`); continue;
+    }
+    const h = line.match(/^(#{1,4})\s+(.*)$/);
+    if(h){ const n = Math.min(h[1].length + 2, 6); out.push(`<h${n}>${mdInline(h[2])}</h${n}>`); continue; }
+    if(/^\s*\|.*\|\s*$/.test(line)){
+      const rows = [];
+      while(i < L.length && /^\s*\|.*\|\s*$/.test(L[i])) rows.push(L[i++]);
+      i--;
+      const cells = r => r.trim().replace(/^\||\|$/g, "").split("|").map(c => c.trim());
+      const body = rows.filter(r => !/^\s*\|[\s:|-]+\|\s*$/.test(r));
+      out.push("<table>" + body.map((r, k) => "<tr>" + cells(r).map(c => k === 0 ? `<th>${mdInline(c)}</th>` : `<td>${mdInline(c)}</td>`).join("") + "</tr>").join("") + "</table>");
+      continue;
+    }
+    if(/^\s*[-*]\s+/.test(line)){
+      const items = [];
+      while(i < L.length && /^\s*[-*]\s+/.test(L[i])){ const ind = L[i].match(/^\s*/)[0].length; items.push(`<li${ind ? ' style="margin-left:18px"' : ''}>${mdInline(L[i].replace(/^\s*[-*]\s+/, ""))}</li>`); i++; }
+      i--; out.push(`<ul>${items.join("")}</ul>`); continue;
+    }
+    if(line.startsWith(">")){ out.push(`<blockquote>${mdInline(line.replace(/^>\s?/, ""))}</blockquote>`); continue; }
+    if(/^---+\s*$/.test(line)){ out.push("<hr>"); continue; }
+    if(line.trim()) out.push(`<p>${mdInline(line)}</p>`);
+  }
+  return out.join("\n");
+}
+
+
+async function loadOverview(){
+  OV = await api("/api/company");
+  const c = OV.charter, s = OV.systems, k = OV.kpis;
+  document.title = `${c.name} HQ`;
+  $("mission").textContent = c.mission;
+  $("model").textContent = c.model;
+  $("charterGrid").innerHTML = [["Scope", c.scope], ["Non-goals", c.non_goals], ["Principles", c.principles],
+    ["Watchlist", c.watchlist.map(w => `${w.label}`)], ["Focus diseases", c.focus_diseases]]
+    .map(([h, xs]) => `<div><h4>${h}</h4><ul>${xs.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>`).join("");
+  if(document.activeElement !== $("charterEdit")) $("charterEdit").value = JSON.stringify(c, null, 2);
+  const kg = s.knowledge_graph;
+  $("pills").innerHTML =
+    `<span class="pill ${kg.connected?'ok':''}">KG ${kg.connected ? kg.nodes.toLocaleString()+' nodes' : 'offline'}</span>` +
+    `<span class="pill ${s.ollama_models.length?'ok':''}">Ollama ${s.ollama_models.length}</span>` +
+    `<span class="pill ${s.rea.available?'ok':''}">REA ${s.rea.available?'ready':'off'}</span>` +
+    `<span class="pill ${s.narrator?'ok':''}">Narrator ${esc(s.narrator || 'off')}</span>`;
+  const tiles = [["Tasks benchmarked", k.tasks_benchmarked], ["Models ranked", k.models_ranked],
+    ["Runs, 7 days", k.runs_7d + (k.failed_7d ? ` <span class="err" style="font-size:13px">${k.failed_7d} failed</span>` : "")],
+    ["Site captures", k.captures], ["Reports", k.reports], ["KG nodes", k.kg_nodes == null ? "—" : k.kg_nodes.toLocaleString()]];
+  $("kpis").innerHTML = tiles.map(([l, v]) => `<div class="kpi"><div class="v">${v}</div><div class="l">${l}</div></div>`).join("");
+  renderDepts();
+}
+
+function field(name, spec, pb){
+  const id = `f_${pb}_${name}`, d = spec.default;
+  if(spec.type === "bool") return `<label class="ck"><input type="checkbox" id="${id}" ${d?'checked':''}> ${esc(name.replace(/_/g," "))}</label>`;
+  if(spec.type === "text") return `<label>${esc(name)}<textarea id="${id}">${esc(d ?? "")}</textarea></label>`;
+  return `<label>${esc(name.replace(/_/g," "))}<input id="${id}" ${spec.type==="int"?'type="number"':''} value="${esc(d ?? "")}"></label>`;
+}
+
+function lastLine(d){
+  const L = d.last_run;
+  return L ? `Last: <b>${esc(L.playbook)}</b> <span class="status s-${L.status}">${L.status}</span> · ${ago(L.started)}${L.report ? ` · <button class="link" onclick="openRun(${L.id})">report</button>` : ""}` : `<span class="muted">No runs yet.</span>`;
+}
+
+let DEPT_SIG = "";
+function renderDepts(){
+  BOOKS = OV.departments.flatMap(d => d.playbooks);
+  const sig = OV.departments.map(d => d.id + ":" + d.playbooks.map(p => p.name).join(",")).join("|");
+  if(sig !== DEPT_SIG){
+    DEPT_SIG = sig;
+    $("depts").innerHTML = OV.departments.map(d => `<div class="dept"><div class="hd"><h3>${esc(d.name)}</h3><span class="agent">${esc(d.agent)}</span></div>
+      <p class="m">${esc(d.mission)}</p>
+      <div class="pbs">${d.playbooks.map(p => `<div class="pb" data-pb="${p.name}">
+        <div class="row1"><div><div class="t">${esc(p.title)}</div><div class="d">${esc(p.description)}</div></div>
+        <button class="small ghost" onclick="toggleForm('${p.name}')">Run…</button></div>
+        <form onsubmit="runBook(event,'${p.name}')">${Object.entries(p.params).map(([n,s]) => field(n,s,p.name)).join("")}
+        <button type="submit">Start ${esc(p.title.toLowerCase())}</button><span class="muted" id="msg_${p.name}" style="font-size:12px"></span></form></div>`).join("")}</div>
+      <div class="last" id="last_${d.id}"></div></div>`).join("");
+    $("sPlay").innerHTML = BOOKS.map(p => `<option value="${p.name}">${esc(p.title)} · ${p.name}</option>`).join("");
+  }
+  OV.departments.forEach(d => { const el = $(`last_${d.id}`); if(el) el.innerHTML = lastLine(d); });
+}
+
+function toggleForm(name){ document.querySelector(`.pb[data-pb="${name}"]`).classList.toggle("open"); }
+
+async function runBook(ev, name){
+  ev.preventDefault();
+  const p = BOOKS.find(b => b.name === name), params = {};
+  for(const [n, s] of Object.entries(p.params)){
+    const el = $(`f_${name}_${n}`);
+    params[n] = s.type === "bool" ? el.checked : s.type === "int" ? parseInt(el.value || s.default) : el.value;
+  }
+  try{
+    const r = await post(`/api/company/run/${name}`, {params});
+    $(`msg_${name}`).textContent = ` started run r${r.run_id}`;
+    await loadFeed(); openRun(r.run_id);
+  }catch(e){ $(`msg_${name}`).innerHTML = ` <span class="err">${esc(e.message)}</span>`; }
+}
+
+let feedTimer, wasLive = 0;
+async function loadFeed(){
+  clearTimeout(feedTimer);
+  const runs = await api("/api/company/runs?limit=40");
+  const live = runs.filter(r => r.status === "running").length;
+  $("feedNote").textContent = live ? `${live} running` : "";
+  $("feed").innerHTML = runs.length ? runs.map(r => {
+    const s = r.summary && typeof r.summary === "object" ? Object.entries(r.summary).filter(([k,v]) => typeof v !== "object").map(([k,v]) => `${k.replace(/_/g," ")}: ${v}`).join(" · ") : "";
+    return `<div class="run ${SEL===r.id?'sel':''}" onclick="openRun(${r.id})"><span class="status s-${r.status}">${r.status}</span>
+      <div><div class="n">${esc(r.playbook)} <span class="muted mono" style="font-size:11px">r${r.id}</span></div><div class="sub">${esc(r.department)} · ${esc(r.trigger)}${s ? " · " + esc(s).slice(0,120) : ""}</div></div>
+      <div class="tm">${ago(r.started)}<br>${dur(r)}</div></div>`;
+  }).join("") : `<p class="muted">No runs yet. Run a playbook above.</p>`;
+  if(live) feedTimer = setTimeout(() => { loadFeed(); if(SEL) openRun(SEL, true); loadOverview(); }, 2500);
+  else if(wasLive){ loadOverview(); if(SEL) openRun(SEL, true); }
+  wasLive = live;
+}
+
+async function openRun(id, quiet){
+  SEL = id;
+  document.querySelectorAll(".run").forEach(e => e.classList.toggle("sel", e.getAttribute("onclick") === `openRun(${id})`));
+  const r = await api(`/api/company/runs/${id}`);
+  let body = "";
+  if(r.report){
+    const md = await api(`/api/company/reports/${encodeURIComponent(r.report)}`);
+    body = `<div class="md">${mdToHtml(md)}</div>`;
+  } else if(r.status === "error"){
+    body = `<p class="err">${esc(r.summary && r.summary.error)}</p>`;
+  } else body = `<p class="muted">Working… the report appears when the run finishes.</p>`;
+  $("viewer").innerHTML = `<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap">
+    <b>${esc(r.playbook)} · r${r.id}</b><span><span class="status s-${r.status}">${r.status}</span> <span class="muted" style="font-size:12px">${when(r.started)} ${dur(r)}</span></span></div>
+    ${body}<details ${r.status!=='done'?'open':''}><summary class="muted" style="cursor:pointer;font-size:13px;margin-top:10px">Agent log</summary><pre class="log">${esc(r.log || "")}</pre></details>`;
+}
+
+async function loadScheds(){
+  const ss = await api("/api/company/schedules");
+  $("scheds").innerHTML = `<tr><th>Playbook</th><th>Every</th><th>Params</th><th>Next run</th><th>Last run</th><th></th></tr>` + (ss.map(s => `<tr>
+    <td class="mono">${esc(s.playbook)}</td><td>${esc(s.every)}</td><td class="mono" style="font-size:12px">${esc(JSON.stringify(s.params||{}))}</td>
+    <td>${s.enabled ? when(s.next_run) : '<span class="muted">paused</span>'}</td><td>${ago(s.last_run)}</td>
+    <td style="white-space:nowrap"><button class="small ghost" onclick="toggleSched(${s.id},${!s.enabled})">${s.enabled?'Pause':'Resume'}</button> <button class="small ghost" onclick="delSched(${s.id})">Delete</button></td></tr>`).join("") || `<tr><td colspan=6 class="muted">No schedules.</td></tr>`);
+}
+async function addSched(){
+  let params = {}; try{ params = $("sParams").value.trim() ? JSON.parse($("sParams").value) : {}; }catch(e){ alert("Params must be JSON"); return; }
+  try{ await post("/api/company/schedules", {playbook:$("sPlay").value, every:$("sEvery").value.trim(), params}); $("sEvery").value=""; $("sParams").value=""; loadScheds(); loadOverview(); }
+  catch(e){ alert(e.message); }
+}
+async function toggleSched(id, enabled){ await post(`/api/company/schedules/${id}`, {enabled}, "PATCH"); loadScheds(); }
+async function delSched(id){ if(confirm("Delete this schedule?")){ await api(`/api/company/schedules/${id}`, {method:"DELETE"}); loadScheds(); } }
+
+async function saveCharter(){
+  try{ await post("/api/company/charter", JSON.parse($("charterEdit").value), "PUT"); $("charterMsg").textContent = "Saved."; loadOverview(); }
+  catch(e){ $("charterMsg").innerHTML = `<span class="err">${esc(e.message)}</span>`; }
+}
+
+async function loadIndex(){
+  const ix = await api("/api/company/index");
+  $("idx").innerHTML = ix.map(e => {
+    const a = e.activity || {}, push = (a.pushed_at || "").slice(0,10);
+    const repo = e.repo ? `<a href="https://github.com/${esc(e.repo)}" target="_blank">${esc(e.repo)}</a>${push ? " · pushed " + push : ""}` : "no repository";
+    return `<article><h3><a href="${esc(e.url)}" target="_blank">${esc(e.name)}</a></h3><div class="cat">${esc(e.category)} · ${repo}</div><p>${esc(e.measures)}</p><div class="cav">${esc(e.caveat)}</div></article>`;
+  }).join("");
+}
+
+loadOverview().then(loadFeed); loadScheds(); loadIndex();
+setInterval(() => { loadOverview(); loadScheds(); }, 20000);
+</script>
+</body>
+</html>

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ddd</title>
+<title>ddd Lab</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -59,6 +59,21 @@ td.num{font-family:"IBM Plex Mono",monospace;text-align:right}
 .arts div.f{padding:3px 0;border-bottom:1px dashed var(--line);display:flex;gap:8px;justify-content:space-between}
 .arts span{font-size:11px;color:var(--muted);white-space:nowrap}
 .preset{background:var(--accent-soft);color:var(--accent);border:1px solid transparent;font-weight:500}
+.roles{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+@media(max-width:860px){.roles{grid-template-columns:1fr 1fr}}
+.role{border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--bg)}
+.role b{font-size:14px}.role p{margin:4px 0 0;font-size:12px;color:var(--muted)}
+.steps{max-height:520px;overflow:auto;font-size:13px}
+.steps div{padding:4px 0;border-bottom:1px dashed var(--line)}
+.steps .r{display:inline-block;min-width:74px;color:var(--accent);font-family:"IBM Plex Mono",monospace;font-size:11px;text-transform:uppercase}
+.scales{display:flex;flex-direction:column;gap:6px}
+.scale{display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-radius:7px;padding:7px 10px;background:var(--bg)}
+.scale .z{font-family:"IBM Plex Mono",monospace;color:var(--muted);font-size:12px;min-width:16px}
+.scale .st{margin-left:auto;font-size:11px;border-radius:4px;padding:1px 7px}
+.st.live{background:var(--accent-soft);color:var(--accent)}
+.st.linked{background:var(--warn-soft);color:var(--warn)}
+.st.planned{color:var(--muted);border:1px solid var(--line)}
+
 pre{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:10px;overflow:auto;max-height:340px;font-size:12px;margin:10px 0 0}
 .jobs div{font-size:13px;padding:3px 0;border-bottom:1px dashed var(--line)}
 .scroll{overflow-x:auto}
@@ -66,8 +81,9 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:
 </head>
 <body>
 <header>
-  <h1><span>ddd</span> · headless drug discovery</h1>
-  <p class="sub">Open benchmarks, a PrimeKG knowledge graph, an MCP agent layer and a Tools Armory, running on your own server.</p>
+  <p style="margin:0 0 6px;font-size:14px"><a href="/" style="color:var(--accent);text-decoration:none">← HQ</a></p>
+  <h1><span>ddd</span> Lab</h1>
+  <p class="sub">Hands-on tools behind the departments: benchmarks, molecule tools, the Tools Armory and the knowledge graph.</p>
   <div class="pills" id="pills"></div>
 </header>
 <main>
@@ -94,6 +110,32 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:
   <section class="w12">
     <h2>Leaderboard</h2>
     <div class="board scroll" id="board"><p class="muted">No runs yet.</p></div>
+  </section>
+  <section class="w12" id="company">
+    <h2>Headless company · discovery programs</h2>
+    <p class="muted" style="font-size:13px;margin:-4px 0 12px">Four agent roles run a program end to end: Scout ranks targets from PrimeKG, Chemist triages molecules, Evaluator screens them through the baselines, Curator writes the report. Deterministic orchestration on public data — not validated, not clinical advice.</p>
+    <div id="roles" class="roles"></div>
+    <div class="row" style="margin-top:12px">
+      <input id="disease" placeholder="disease, e.g. idiopathic pulmonary fibrosis" style="flex:2">
+      <input id="progMols" placeholder="molecules: SMILES, comma-separated" style="flex:3">
+      <button onclick="runProgram()">Run program</button>
+    </div>
+    <div class="grid2">
+      <div><h3 class="h3">Run log</h3><div id="progSteps" class="steps"><p class="muted">No program run yet.</p></div></div>
+      <div><h3 class="h3">Program report</h3><pre id="progReport" class="mono" style="max-height:520px">—</pre></div>
+    </div>
+  </section>
+  <section class="w6" id="indexsec">
+    <h2>Benchmark Index</h2>
+    <p class="muted" style="font-size:13px;margin:-4px 0 10px">Open benchmarks, each with a known caveat. O3DC-style, local and extensible.</p>
+    <div id="indexCats" class="pills" style="margin-bottom:8px"></div>
+    <div class="scroll" id="indexTable"></div>
+  </section>
+  <section class="w6" id="vcellsec">
+    <h2>Virtual Cell</h2>
+    <p class="muted" style="font-size:13px;margin:-4px 0 10px">Six biological scales; the intracellular scale links to Fate Memory Lab. A stable scaffold while engines are filled in.</p>
+    <div id="vcellScales" class="scales"></div>
+    <p class="muted" id="vcellNote" style="font-size:12px;margin-top:10px"></p>
   </section>
   <section class="w12" id="armory">
     <h2>Tools Armory</h2>
@@ -261,6 +303,34 @@ async function viewArtifact(kind, name){
   window.open(`/api/armory-files/${kind}/${encodeURIComponent(name)}?download=true`);
 }
 initArmory();
+
+async function initCompany(){
+  const c = await api("/api/company/roles");
+  $("roles").innerHTML = c.roles.map(r => `<div class="role"><b>${esc(r.name)}</b><p>${esc(r.does)}</p></div>`).join("");
+  const idx = await api("/api/index");
+  $("indexCats").innerHTML = Object.entries(idx.categories).map(([k,v]) => `<span class="pill">${esc(k)} · ${v}</span>`).join("");
+  $("indexTable").innerHTML = `<table><tr><th>Benchmark</th><th>Category</th><th>Known caveat</th></tr>` + idx.entries.map(e =>
+    `<tr><td><b>${esc(e.name)}</b>${e.repo?`<br><span class="muted mono" style="font-size:11px">${esc(e.repo)}</span>`:''}<br><span class="muted">${esc(e.measures)}</span></td><td>${esc(e.category)}</td><td><div class="caveat">${esc(e.caveat)}</div></td></tr>`).join("") + `</table>`;
+  const v = await api("/api/vcell");
+  $("vcellScales").innerHTML = v.scales.map(sc => `<div class="scale"><span class="z">${sc.zoom}</span><div><b>${esc(sc.name)}</b><br><span class="muted" style="font-size:12px">${esc(sc.models)}</span></div><span class="st ${sc.status}">${sc.status}</span></div>`).join("");
+  $("vcellNote").textContent = v.note;
+}
+async function runProgram(){
+  const disease = $("disease").value.trim();
+  const mols = $("progMols").value.split(",").map(x => x.trim()).filter(Boolean);
+  if(!disease && !mols.length){ $("progReport").textContent = "Enter a disease and/or some SMILES."; return; }
+  $("progSteps").innerHTML = ""; $("progReport").textContent = "Running…";
+  const j = await api("/api/company/program", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({disease, molecules:mols})});
+  watchProgram(j.id);
+}
+async function watchProgram(id){
+  const j = await api(`/api/jobs/${id}`);
+  if(j.steps) $("progSteps").innerHTML = j.steps.map(s => `<div><span class="r">${esc(s.role)}</span> ${esc(s.msg)}</div>`).join("");
+  if(j.status==="done"){ $("progReport").textContent = j.result.report; loadBoard(); }
+  else if(j.status==="error"){ $("progReport").textContent = "Error: " + j.error; }
+  else setTimeout(() => watchProgram(id), 1500);
+}
+initCompany();
 </script>
 </body>
 </html>

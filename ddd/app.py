@@ -8,11 +8,14 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import __version__, kg, store
 from .armory import PRESETS, TOOLS, run_tool
 from .armory import rea as rea_bridge
+from . import index_catalog, vcell
+from .company import programs as company_programs
 from .armory.paths import list_artifacts, resolve
 from .chem import describe
 from .config import MCP_PORT
@@ -39,8 +42,13 @@ class PredictReq(BaseModel):
 
 
 @app.get("/")
-def index():
-    return FileResponse(STATIC / "index.html")
+def hq():
+    return FileResponse(STATIC / "hq.html")
+
+
+@app.get("/lab")
+def lab():
+    return FileResponse(STATIC / "lab.html")
 
 
 @app.get("/api/info")
@@ -196,3 +204,179 @@ def armory_file(kind: str, name: str, download: bool = False):
     if kind == "reports" and not download:
         return PlainTextResponse(p.read_text())
     return FileResponse(p, filename=p.name)
+
+
+# ---------- Headless company ----------
+
+class ProgramReq(BaseModel):
+    disease: str
+    molecules: list[str] = []
+    top_targets: int = 15
+
+
+class IndexEntry(BaseModel):
+    name: str
+    category: str
+    maintainer: str = ""
+    repo: str = ""
+    url: str = ""
+    measures: str
+    caveat: str
+
+
+@app.get("/api/company/roles")
+def company_roles():
+    return {"roles": company_programs.ROLES, "screen": [{"task": t, "label": l} for t, l in company_programs.SCREEN]}
+
+
+def _program_job(job_id, req: ProgramReq):
+    def step(s):
+        JOBS[job_id].setdefault("steps", []).append(s)
+        JOBS[job_id]["progress"] = f"{s['role']}: {s['msg'][:60]}"
+    try:
+        JOBS[job_id]["status"] = "running"
+        res = company_programs.run_program(req.disease, req.molecules, req.top_targets, step)
+        JOBS[job_id].update(status="done", result=res)
+    except Exception as e:
+        JOBS[job_id].update(status="error", error=str(e)[:400], trace=traceback.format_exc()[-1500:])
+
+
+@app.post("/api/company/program")
+def company_program(req: ProgramReq):
+    job_id = uuid.uuid4().hex[:10]
+    with _lock:
+        JOBS[job_id] = {"id": job_id, "status": "queued", "task": "program", "model": req.disease, "progress": "", "tool": "program"}
+    threading.Thread(target=_program_job, args=(job_id, req), daemon=True).start()
+    return JOBS[job_id]
+
+
+@app.get("/api/index")
+def index_list():
+    return {"entries": index_catalog.load_index(), "categories": index_catalog.categories()}
+
+
+@app.post("/api/index")
+def index_add(e: IndexEntry):
+    try:
+        return index_catalog.add_entry(e.dict())
+    except ValueError as ex:
+        raise HTTPException(400, str(ex))
+
+
+@app.get("/api/vcell")
+def vcell_overview():
+    return vcell.overview()
+
+
+# ---------- Company ----------
+
+from .company import charter as charter_mod  # noqa: E402
+from .company import db as cdb  # noqa: E402
+from .company import engine  # noqa: E402
+from .company.paths import PUBLIC, safe_report  # noqa: E402
+from .company.playbooks import open_index  # noqa: E402
+
+app.mount("/public", StaticFiles(directory=PUBLIC, html=True, check_dir=False), name="public")
+
+
+@app.on_event("startup")
+def _boot():
+    engine.start_scheduler()
+
+
+class PlaybookReq(BaseModel):
+    params: dict = {}
+
+
+class ScheduleReq(BaseModel):
+    playbook: str
+    every: str
+    params: dict = {}
+
+
+class ToggleReq(BaseModel):
+    enabled: bool
+
+
+@app.get("/api/company")
+def company_overview():
+    return engine.overview()
+
+
+@app.get("/api/company/charter")
+def get_charter():
+    return charter_mod.load()
+
+
+@app.put("/api/company/charter")
+def put_charter(update: dict):
+    return charter_mod.save(update)
+
+
+@app.get("/api/company/playbooks")
+def playbooks():
+    return [p.meta() for p in engine.PLAYBOOKS.values()]
+
+
+@app.post("/api/company/run/{name}")
+def run_playbook(name: str, req: PlaybookReq):
+    try:
+        return {"run_id": engine.start(name, req.params, "manual")}
+    except (KeyError, ValueError) as e:
+        raise HTTPException(400, str(e))
+
+
+@app.get("/api/company/runs")
+def company_runs(limit: int = 40):
+    out = cdb.runs(limit)
+    for r in out:
+        r.pop("log", None)
+    return out
+
+
+@app.get("/api/company/runs/{run_id}")
+def company_run(run_id: int):
+    r = cdb.run_get(run_id)
+    if not r:
+        raise HTTPException(404)
+    return r
+
+
+@app.get("/api/company/reports/{name}")
+def company_report(name: str):
+    try:
+        return PlainTextResponse(safe_report(name).read_text())
+    except (ValueError, FileNotFoundError) as e:
+        raise HTTPException(404, str(e))
+
+
+@app.get("/api/company/schedules")
+def company_schedules():
+    return cdb.schedules()
+
+
+@app.post("/api/company/schedules")
+def add_schedule(req: ScheduleReq):
+    if req.playbook not in engine.PLAYBOOKS:
+        raise HTTPException(400, f"unknown playbook {req.playbook}")
+    try:
+        return {"id": cdb.schedule_add(req.playbook, req.params, req.every)}
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.patch("/api/company/schedules/{sid}")
+def toggle_schedule(sid: int, req: ToggleReq):
+    cdb.schedule_set(sid, enabled=req.enabled)
+    return {"ok": True}
+
+
+@app.delete("/api/company/schedules/{sid}")
+def delete_schedule(sid: int):
+    cdb.schedule_set(sid, delete=True)
+    return {"ok": True}
+
+
+@app.get("/api/company/index")
+def company_index():
+    return open_index(False)
