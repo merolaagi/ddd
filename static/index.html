@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ddd</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f4ef; --panel:#ffffff; --ink:#1b1f1c; --muted:#5f6a63; --line:#dedbd1;
+  --accent:#1f6f5c; --accent-soft:#e3efe9; --warn:#9a5b00; --warn-soft:#fbf1df; --bad:#a3322a;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f1311; --panel:#161b18; --ink:#e7ece8; --muted:#94a199; --line:#2a322d;
+  --accent:#5cc3a4; --accent-soft:#18302a; --warn:#e2a64a; --warn-soft:#2c2416; --bad:#e2766c;}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "IBM Plex Sans",system-ui,sans-serif}
+code,.mono,input,select,textarea{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:13px}
+header{padding:28px 24px 12px;max-width:1180px;margin:auto}
+h1{margin:0;font-size:26px;font-weight:600;letter-spacing:-.01em}
+h1 span{color:var(--accent)}
+.sub{color:var(--muted);margin:4px 0 12px}
+.pills{display:flex;gap:8px;flex-wrap:wrap}
+.pill{border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-size:12px;background:var(--panel)}
+.pill.ok{border-color:var(--accent);color:var(--accent)}
+.pill.off{color:var(--muted)}
+main{max-width:1180px;margin:auto;padding:0 24px 48px;display:grid;grid-template-columns:repeat(12,1fr);gap:16px}
+section{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px;min-width:0}
+.w12{grid-column:span 12}.w7{grid-column:span 7}.w5{grid-column:span 5}.w6{grid-column:span 6}
+@media(max-width:860px){.w7,.w5,.w6{grid-column:span 12}main{padding:0 16px 40px}header{padding:22px 16px 10px}}
+h2{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0 0 12px;font-weight:600}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+input,select,textarea{background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:7px 9px}
+input,textarea{flex:1;min-width:0;width:100%}
+select{max-width:100%}
+button{background:var(--accent);color:var(--panel);border:0;border-radius:6px;padding:8px 14px;font-weight:600;cursor:pointer;font-family:inherit}
+button.ghost{background:transparent;color:var(--accent);border:1px solid var(--accent)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;color:var(--muted);font-weight:500}
+td.nowrap{white-space:nowrap}
+.board table{table-layout:fixed;min-width:520px}
+.board col.c1{width:40px}.board col.c2{width:26%}.board col.c3{width:90px}.board col.c4{width:70px}
+td.num{font-family:"IBM Plex Mono",monospace;text-align:right}
+.caveat{background:var(--warn-soft);color:var(--warn);font-size:12px;padding:4px 8px;border-radius:6px;margin-top:4px}
+.tag{font-size:11px;border:1px solid var(--line);border-radius:4px;padding:1px 6px;color:var(--muted)}
+.board h3{font-size:15px;margin:14px 0 4px}
+.board h3:first-child{margin-top:0}
+.muted{color:var(--muted)}
+.err{color:var(--bad)}
+.chk{display:flex;gap:6px;align-items:center;font-size:13px;color:var(--muted)}
+.chk input{flex:0 0 auto;min-width:0;width:16px;height:16px;padding:0;appearance:auto;-webkit-appearance:checkbox;accent-color:var(--accent);margin:0}
+.grid2{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,3fr);gap:16px;margin-top:14px}
+@media(max-width:860px){.grid2{grid-template-columns:1fr}}
+.h3{font-size:12px;color:var(--muted);font-weight:600;margin:0 0 6px;text-transform:uppercase;letter-spacing:.06em}
+.arts .k{font-size:11px;color:var(--muted);margin:8px 0 2px;text-transform:uppercase}
+.arts a{color:var(--accent);text-decoration:none;font-family:"IBM Plex Mono",monospace;font-size:12px;word-break:break-all}
+.arts div.f{padding:3px 0;border-bottom:1px dashed var(--line);display:flex;gap:8px;justify-content:space-between}
+.arts span{font-size:11px;color:var(--muted);white-space:nowrap}
+.preset{background:var(--accent-soft);color:var(--accent);border:1px solid transparent;font-weight:500}
+pre{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:10px;overflow:auto;max-height:340px;font-size:12px;margin:10px 0 0}
+.jobs div{font-size:13px;padding:3px 0;border-bottom:1px dashed var(--line)}
+.scroll{overflow-x:auto}
+</style>
+</head>
+<body>
+<header>
+  <h1><span>ddd</span> · headless drug discovery</h1>
+  <p class="sub">Open benchmarks, a PrimeKG knowledge graph, an MCP agent layer and a Tools Armory, running on your own server.</p>
+  <div class="pills" id="pills"></div>
+</header>
+<main>
+  <section class="w7">
+    <h2>Run an evaluation</h2>
+    <div class="row">
+      <select id="task"></select>
+      <select id="model"></select>
+      <input id="sample" type="number" min="5" placeholder="LLM sample (100)" style="max-width:170px;flex:0">
+      <button onclick="startRun()">Run</button>
+    </div>
+    <p class="muted" style="font-size:13px;margin:10px 0 0">Baselines (rf, logreg) train on the scaffold-split train set and score unseen chemotypes. <code>ollama:*</code> models answer zero-shot on a sample of the same test set, at no API cost.</p>
+    <div class="jobs" id="jobs" style="margin-top:10px"></div>
+  </section>
+  <section class="w5">
+    <h2>Molecule</h2>
+    <div class="row">
+      <input id="smi" placeholder="SMILES, e.g. CC(=O)Oc1ccccc1C(=O)O">
+      <button class="ghost" onclick="describeMol()">Describe</button>
+      <button class="ghost" onclick="predictMol()">Predict</button>
+    </div>
+    <pre id="molout" class="mono">—</pre>
+  </section>
+  <section class="w12">
+    <h2>Leaderboard</h2>
+    <div class="board scroll" id="board"><p class="muted">No runs yet.</p></div>
+  </section>
+  <section class="w12" id="armory">
+    <h2>Tools Armory</h2>
+    <p class="muted" style="font-size:13px;margin:-4px 0 12px">On-demand tools ddd pulls up when it needs them. Recon captures a public page as HAR in headless Chromium, maps its data endpoints and schemas, runs REA on the capture and writes a report.</p>
+    <div class="row" id="presets"></div>
+    <div class="row" style="margin-top:8px">
+      <input id="reconUrl" placeholder="https://… public page to study">
+      <label class="chk"><input type="checkbox" id="reconExplore" checked> auto-explore</label>
+      <label class="chk"><input type="checkbox" id="reconRea" checked> run REA</label>
+      <button onclick="runRecon()">Run recon</button>
+    </div>
+    <details style="margin-top:12px"><summary class="muted" style="cursor:pointer;font-size:13px">Run any tool</summary>
+      <div class="row" style="margin-top:8px">
+        <select id="toolSel" onchange="toolHelp()"></select>
+        <input id="toolArgs" placeholder='{"har": "…har", "match": "data"}'>
+        <button class="ghost" onclick="runTool()">Run tool</button>
+      </div>
+      <p class="muted" id="toolHelp" style="font-size:12px;margin:6px 0 0"></p>
+    </details>
+    <div class="grid2">
+      <div><h3 class="h3">Artifacts</h3><div id="artifacts" class="arts"><p class="muted">Nothing captured yet.</p></div></div>
+      <div><h3 class="h3">Output</h3><pre id="armout" class="mono" style="max-height:520px">—</pre></div>
+    </div>
+  </section>
+  <section class="w6">
+    <h2>Knowledge graph · PrimeKG</h2>
+    <div class="row">
+      <input id="kgq" placeholder="entity name, e.g. metformin">
+      <button class="ghost" onclick="kg('search')">Search</button>
+      <button class="ghost" onclick="kg('summary')">Relations</button>
+      <button class="ghost" onclick="kg('neighbors')">Neighbors</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <input id="kgb" placeholder="second entity, or a disease for targets">
+      <button class="ghost" onclick="kg('path')">Path</button>
+      <button class="ghost" onclick="kg('targets')">Targets</button>
+    </div>
+    <pre id="kgout" class="mono">—</pre>
+  </section>
+  <section class="w6">
+    <h2>Tasks</h2>
+    <div class="scroll"><table id="tasks"></table></div>
+  </section>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const api = async (p, o) => { const r = await fetch(p, o); const j = await r.json().catch(()=>({})); if(!r.ok) throw new Error(j.detail || r.status); return j; };
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let TASKS = [];
+
+async function init(){
+  const [info, tasks, models] = await Promise.all([api("/api/info"), api("/api/tasks"), api("/api/models")]);
+  TASKS = tasks;
+  const k = info.kg;
+  $("pills").innerHTML =
+    `<span class="pill">v${esc(info.version)}</span>` +
+    `<span class="pill ${k.connected?'ok':'off'}">KG ${k.connected ? (k.nodes.toLocaleString()+' nodes · '+k.relationships.toLocaleString()+' edges') : 'offline'}</span>` +
+    `<span class="pill">MCP · 127.0.0.1:${info.mcp_port}/mcp</span>` +
+    `<span class="pill ${info.rea.available?'ok':'off'}">REA ${info.rea.available?'ready':'needs Node 22+'}</span>` +
+    `<span class="pill ${models.some(m=>m.startsWith('ollama:'))?'ok':'off'}">Ollama ${models.filter(m=>m.startsWith('ollama:')).length} models</span>`;
+  $("task").innerHTML = tasks.map(t => `<option value="${t.id}" ${t.available?'':'disabled'}>${esc(t.id)} — ${esc(t.name)}</option>`).join("");
+  $("model").innerHTML = models.map(m => `<option>${esc(m)}</option>`).join("");
+  $("tasks").innerHTML = `<tr><th>Task</th><th>Domain</th><th>Metric</th></tr>` + tasks.map(t =>
+    `<tr><td><b>${esc(t.id)}</b> <span class="tag">${t.split}</span>${t.cached?'':' <span class="tag">not downloaded</span>'}<br><span class="muted">${esc(t.name)}</span><div class="caveat">${esc(t.caveat)}</div></td><td>${esc(t.domain)}</td><td class="mono nowrap">${t.primary_metric} ${t.higher_is_better?'↑':'↓'}</td></tr>`).join("");
+  loadBoard(); pollJobs();
+}
+
+async function loadBoard(){
+  const b = await api("/api/leaderboard");
+  const ids = Object.keys(b);
+  if(!ids.length){ $("board").innerHTML = `<p class="muted">No runs yet.</p>`; return; }
+  $("board").innerHTML = ids.map(id => {
+    const t = TASKS.find(x => x.id === id) || {};
+    return `<h3>${esc(id)} <span class="muted" style="font-weight:400">· ${esc(t.name||'')} · ${t.primary_metric||''} ${t.higher_is_better?'↑':'↓'}</span></h3>
+    <table><colgroup><col class="c1"><col class="c2"><col class="c3"><col class="c4"><col></colgroup><tr><th>#</th><th>Model</th><th style="text-align:right">Score</th><th style="text-align:right">n test</th><th>Notes</th></tr>` +
+    b[id].map((r,i) => `<tr><td>${i+1}</td><td class="mono">${esc(r.model)}</td><td class="num">${r.score==null?'—':r.score.toFixed(4)}</td><td class="num">${r.n_test}</td><td class="muted">${esc(r.extra.note||'')}${r.extra.auprc!=null?' AUPRC '+r.extra.auprc:''}${r.extra.r2!=null?' R² '+r.extra.r2:''}</td></tr>`).join("") + `</table>`;
+  }).join("");
+}
+
+async function startRun(){
+  const body = {task:$("task").value, model:$("model").value};
+  if($("sample").value) body.sample = +$("sample").value;
+  await api("/api/run", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)});
+  pollJobs();
+}
+
+let pollTimer;
+async function pollJobs(){
+  clearTimeout(pollTimer);
+  const jobs = (await api("/api/jobs")).reverse();
+  $("jobs").innerHTML = jobs.slice(0,8).map(j => `<div><span class="mono">${esc(j.task)} · ${esc(j.model)}</span> — ${
+    j.status==="done" ? (j.tool ? `<b>done</b>` : `<b>${j.result.metric} ${j.result.score}</b> <span class="muted">(${j.result.seconds}s)</span>`) :
+    j.status==="error" ? `<span class="err">${esc(j.error)}</span>` : `${j.status} ${esc(j.progress||'')}`}</div>`).join("");
+  if(jobs.some(j => j.status==="running" || j.status==="queued")) pollTimer = setTimeout(pollJobs, 1500);
+  else loadBoard();
+}
+
+async function describeMol(){
+  try{ $("molout").textContent = JSON.stringify(await api("/api/molecule?smiles="+encodeURIComponent($("smi").value)), null, 2); }
+  catch(e){ $("molout").textContent = e.message; }
+}
+async function predictMol(){
+  $("molout").textContent = "Predicting (trains the rf baseline on first use)…";
+  try{
+    const r = await api("/api/predict", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({task:$("task").value, smiles:[$("smi").value]})});
+    $("molout").textContent = `task: ${$("task").value}\n` + JSON.stringify(r[0], null, 2);
+  }catch(e){ $("molout").textContent = e.message; }
+}
+async function kg(kind){
+  const a = encodeURIComponent($("kgq").value), b = encodeURIComponent($("kgb").value);
+  const url = {search:`/api/kg/search?q=${a}`, summary:`/api/kg/summary?name=${a}`, neighbors:`/api/kg/neighbors?name=${a}`,
+               path:`/api/kg/path?a=${a}&b=${b}`, targets:`/api/kg/targets?disease=${b||a}`}[kind];
+  $("kgout").textContent = "…";
+  try{ $("kgout").textContent = JSON.stringify(await api(url), null, 2); }
+  catch(e){ $("kgout").textContent = e.message; }
+}
+init();
+
+let TOOLS=[];
+async function initArmory(){
+  const a = await api("/api/armory");
+  TOOLS = a.tools;
+  $("presets").innerHTML = a.presets.map(p => `<button class="preset" onclick="$('reconUrl').value='${p.url}'">${esc(p.label)}</button>`).join("");
+  $("toolSel").innerHTML = TOOLS.map(t => `<option value="${t.name}">${esc(t.title)} · ${t.name}</option>`).join("");
+  toolHelp(); loadArtifacts();
+}
+function toolHelp(){
+  const t = TOOLS.find(x => x.name === $("toolSel").value); if(!t) return;
+  const ps = Object.entries(t.params).map(([k,v]) => k + (v.default!==undefined ? `=${JSON.stringify(v.default)}` : "")).join(", ");
+  $("toolHelp").textContent = t.description + (ps ? "  Args: " + ps : "");
+}
+async function startTool(name, args){
+  $("armout").textContent = `${name} running…`;
+  const j = await api(`/api/armory/${name}`, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({args})});
+  watchTool(j.id);
+}
+async function watchTool(id){
+  const j = await api(`/api/jobs/${id}`);
+  if(j.status==="done"){
+    $("armout").textContent = JSON.stringify(j.result, null, 2); loadArtifacts();
+    if(j.result && j.result.report) viewArtifact("reports", j.result.report);
+  } else if(j.status==="error"){ $("armout").textContent = "Error: " + j.error; }
+  else { $("armout").textContent = `${j.model} ${j.status}… (page load, auto-explore and REA can take a minute or two)`; setTimeout(() => watchTool(id), 2000); }
+}
+function runRecon(){
+  const url = $("reconUrl").value.trim(); if(!url) return;
+  startTool("site_recon", {url, explore:$("reconExplore").checked, run_rea:$("reconRea").checked});
+}
+function runTool(){
+  let args = {}; try{ args = $("toolArgs").value.trim() ? JSON.parse($("toolArgs").value) : {}; }
+  catch(e){ $("armout").textContent = "Args must be JSON: " + e.message; return; }
+  startTool($("toolSel").value, args);
+}
+async function loadArtifacts(){
+  const a = await api("/api/armory-files");
+  const label = {reports:"Reports", har:"HAR captures", rea:"REA evidence"};
+  const html = ["reports","har","rea"].filter(k => a[k].length).map(k => `<div class="k">${label[k]}</div>` + a[k].slice(0,8).map(f =>
+    `<div class="f"><a href="#" onclick="viewArtifact('${k}','${f.name}');return false">${esc(f.name)}</a><span>${(f.bytes/1024).toFixed(0)} KB · <a href="/api/armory-files/${k}/${encodeURIComponent(f.name)}?download=true">↓</a></span></div>`).join("")).join("");
+  $("artifacts").innerHTML = html || `<p class="muted">Nothing captured yet.</p>`;
+}
+async function viewArtifact(kind, name){
+  if(kind === "reports"){ $("armout").textContent = await (await fetch(`/api/armory-files/reports/${encodeURIComponent(name)}`)).text(); return; }
+  if(kind === "har"){ $("toolSel").value = "har_payload"; toolHelp(); $("toolArgs").value = JSON.stringify({har:name, match:""});
+    $("armout").textContent = "Summarising…"; const j = await api(`/api/armory/har_summary`, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({args:{har:name}})}); watchTool(j.id); return; }
+  window.open(`/api/armory-files/${kind}/${encodeURIComponent(name)}?download=true`);
+}
+initArmory();
+</script>
+</body>
+</html>
