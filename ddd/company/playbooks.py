@@ -80,8 +80,11 @@ def intel_watchlist_sweep(ctx, run_rea: bool = True):
         lines += [f"## {label}", "", f"- URL: {url}", f"- Title: {summ.get('title')}",
                   f"- Requests: {res['entries']} · data endpoints: {res['data_endpoints']}",
                   f"- Recon report: `{res['report']}`"]
-        if res.get("rea") and "error" not in res["rea"]:
-            lines.append(f"- REA evidence: `{res['rea']['output']}` ({res['rea'].get('records')} records)")
+        if res.get("rea"):
+            if "error" in res["rea"]:
+                lines.append(f"- REA: **failed**: {res['rea']['error']}")
+            else:
+                lines.append(f"- REA evidence: `{res['rea']['output']}` ({res['rea'].get('records')} records)")
         if diff is None:
             lines.append("- First capture: baseline recorded.")
         else:

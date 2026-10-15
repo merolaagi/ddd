@@ -54,7 +54,7 @@ def site_recon(url: str, explore: bool = True, run_rea: bool = True) -> dict:
     if rea_res is None:
         lines.append("Skipped.")
     elif "error" in rea_res:
-        lines.append(f"Not run: {rea_res['error']}")
+        lines.append(f"Failed: {rea_res['error']}")
     else:
         lines.append(f"`{rea_res['command']}` → exit {rea_res['exit_code']}, "
                      f"{rea_res.get('records')} records, output `{rea_res['output']}`")

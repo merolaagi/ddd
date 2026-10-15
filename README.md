@@ -1,4 +1,4 @@
-# ddd · v0.4.1
+# ddd · v0.4.2
 
 **A headless drug-discovery intelligence company on one Mac.** No staff: six
 departments run as agents executing playbooks on a schedule or on request. The
@@ -20,7 +20,7 @@ Every release ships as `ddd-vX.Y.Z.tar.gz`. The same line installs the first
 time and upgrades later; data, `.venv` and `.env` are kept.
 
 ```
-cd ~/Downloads && tar -xzf ddd-v0.4.1.tar.gz && bash ddd-v0.4.1/install.sh && cd ~/Sites/ddd && ./serve.sh && git push
+cd ~/Downloads && tar -xzf ddd-v0.4.2.tar.gz && bash ddd-v0.4.2/install.sh && cd ~/Sites/ddd && ./serve.sh && git push
 ```
 
 ## The company
@@ -77,7 +77,10 @@ The server refuses to start with a public host and no token. The web UI
 On-demand tools behind the departments, from the Lab, the API
 (`POST /api/armory/<tool>`) or MCP (`armory_list`, `armory_run`):
 `site_recon`, `har_capture`, `har_summary`, `har_payload`, `rea_inspect`,
-`artifacts`. Captures stay in `data/armory/` (git-ignored). Recon refuses
+`artifacts`. Captures stay in `data/armory/` (git-ignored). Before REA runs, ddd
+writes a temporary copy with server IP addresses normalised (REA's HAR schema
+rejects bracketed IPv6) and, over 30 MB, media bodies dropped; REA failures are
+reported with REA's own reason. Recon refuses
 private, loopback and link-local addresses, so a remote caller can't use the
 Mac to browse your home network.
 
