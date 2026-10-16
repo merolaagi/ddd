@@ -16,7 +16,7 @@ from ..armory.paths import DIRS, stamp_name
 from ..chem import describe
 from ..models import BASELINES, ollama_models
 from ..runner import predict, run as bench_run
-from ..tasks import TASKS, available_tasks
+from ..tasks import TASKS, PHASES, available_tasks
 from . import charter as charter_mod
 from . import db
 from .paths import COMPANY_DIR, PUBLIC
@@ -132,23 +132,50 @@ def bench_full_sweep(ctx, include_llm: bool = False, llm_sample: int = 50):
             prev = before.get((t["id"], m))
             rows.append({"task": t["id"], "model": m, "metric": r["metric"], "score": r["score"],
                          "prev_best": prev, "hib": t["higher_is_better"], "n_test": r["n_scored"]})
+    sb = store.scoreboard(TASKS)
     lines = ["# Evaluation: full benchmark sweep", "",
-             f"Models: {', '.join(models)} · tasks: {len(tasks)} · scaffold splits (OGB split for ogbg-molhiv).", "",
-             "| Task | Model | Metric | Score | Previous best | n test |", "|---|---|---|---|---|---|"]
+             f"Models: {', '.join(models)} · tasks attempted: {len(tasks)} · scaffold splits "
+             "(OGB split for ogbg-molhiv). TDC sets are re-split here, so scores aren't comparable "
+             "to TDC's own leaderboard.", ""]
+
+    if sb["models"]:
+        lines += ["## ddd score", "",
+                  "Each task's models are min-max normalised to 0-100 (direction-aware), then averaged "
+                  "per model across categories. Only tasks with 2+ scored models count, so a lone score "
+                  "can't set the scale. This is a relative ranking among the models run here, not an "
+                  "absolute quality score.", "",
+                  "| Rank | Model | ddd score | " + " | ".join(sb["categories"]) + " | tasks |",
+                  "|---|---|---|" + "---|" * len(sb["categories"]) + "---|"]
+        for r in sb["models"]:
+            cats = " | ".join(str(r["by_category"].get(c, "—")) for c in sb["categories"])
+            lines.append(f"| {r['rank']} | {r['model']} | **{r['score']}** | {cats} | {r['tasks']} |")
+        lines.append("")
+
     regress = 0
+    by_phase = defaultdict(list)
     for r in rows:
-        flag = ""
-        if r["prev_best"] is not None and r["score"] is not None:
-            worse = r["score"] < r["prev_best"] if r["hib"] else r["score"] > r["prev_best"]
-            if worse and abs(r["score"] - r["prev_best"]) > 0.01:
-                flag, regress = " ⚠", regress + 1
-        lines.append(f"| {r['task']} | {r['model']} | {r['metric']} | {r['score']}{flag} | "
-                     f"{r['prev_best'] if r['prev_best'] is not None else '—'} | {r['n_test']} |")
+        by_phase[TASKS[r["task"]].phase or "Other"].append(r)
+    lines += ["## Results by drug-R&D phase", ""]
+    for phase in PHASES + ["Other"]:
+        if phase not in by_phase:
+            continue
+        lines += [f"### {phase}", "", "| Task | Model | Metric | Score | Previous best | n test |",
+                  "|---|---|---|---|---|---|"]
+        for r in sorted(by_phase[phase], key=lambda r: (r["task"], r["model"])):
+            flag = ""
+            if r["prev_best"] is not None and r["score"] is not None:
+                worse = r["score"] < r["prev_best"] if r["hib"] else r["score"] > r["prev_best"]
+                if worse and abs(r["score"] - r["prev_best"]) > 0.01:
+                    flag, regress = " ⚠", regress + 1
+            lines.append(f"| {r['task']} | {r['model']} | {r['metric']} | {r['score']}{flag} | "
+                         f"{r['prev_best'] if r['prev_best'] is not None else '—'} | {r['n_test']} |")
+        lines.append("")
     if fails:
-        lines += ["", "## Failures", ""] + [f"- {f['task']} × {f['model']}: {f['error']}" for f in fails]
-    lines += ["", "Baselines are deterministic, so a ⚠ (worse than previous best by more than 0.01) "
-                  "means the data or code changed, not luck."]
-    return {"runs": len(rows), "failures": len(fails), "regressions": regress}, lines
+        lines += ["## Failures", ""] + [f"- {f['task']} × {f['model']}: {f['error']}" for f in fails] + [""]
+    lines += ["Baselines are deterministic, so a ⚠ (worse than previous best by more than 0.01) "
+              "means the data or code changed, not luck."]
+    return {"runs": len(rows), "failures": len(fails), "regressions": regress,
+            "models_ranked": len(sb["models"]), "top_model": sb["models"][0]["model"] if sb["models"] else None}, lines
 
 
 # ---------------------------------------------------------------- Target biology
@@ -156,7 +183,15 @@ def bench_full_sweep(ctx, include_llm: bool = False, llm_sample: int = 50):
 def bio_target_dossier(ctx, disease: str, top: int = 12):
     st = kg.status()
     if not st.get("connected"):
-        raise RuntimeError("Knowledge graph is offline. Start Neo4j and load PrimeKG (see README), then rerun.")
+        err = (st.get("error") or "").lower()
+        if "unauthorized" in err or "authentication" in err:
+            raise RuntimeError("Neo4j is running but ddd's credentials are wrong. Set NEO4J_PASSWORD "
+                               "in ~/Sites/ddd/.env to your Neo4j password and restart (./serve.sh).")
+        raise RuntimeError("Knowledge graph is offline. Start Neo4j and load PrimeKG (see README), "
+                           f"then rerun. Detail: {st.get('error', 'no connection')[:160]}")
+    if not st.get("nodes"):
+        raise RuntimeError("Neo4j is connected but empty. Load PrimeKG: "
+                           ".venv/bin/python scripts/load_primekg.py --download")
     name = kg.find_disease(disease)
     if not name:
         raise RuntimeError(f"No disease in PrimeKG matches '{disease}'. Try a broader name.")
@@ -276,11 +311,18 @@ def _esc(s):
 
 def export_public_site(index, board):
     c = charter_mod.load()
+    sb = store.scoreboard(TASKS)
+    sb_head = "".join(f"<th class=n>{_esc(cat)}</th>" for cat in sb["categories"])
+    sb_rows = []
+    for r in sb["models"]:
+        cats = "".join(f"<td class=n>{r['by_category'].get(cat, '—')}</td>" for cat in sb["categories"])
+        sb_rows.append(f"<tr><td class=n>{r['rank']}</td><td class=m>{_esc(r['model'])}</td>"
+                       f"<td class=n><b>{r['score']}</b></td>{cats}<td class=n>{r['tasks']}</td></tr>")
     rows = []
     for tid, lst in board.items():
         t = TASKS[tid]
         for i, r in enumerate(lst, 1):
-            rows.append(f"<tr><td>{_esc(tid)}</td><td>{i}</td><td class=m>{_esc(r['model'])}</td>"
+            rows.append(f"<tr><td>{_esc(tid)}</td><td>{_esc(t.phase or '—')}</td><td>{i}</td><td class=m>{_esc(r['model'])}</td>"
                         f"<td class=n>{r['score']:.4f}</td><td>{t.primary_metric} {'↑' if t.higher_is_better else '↓'}</td>"
                         f"<td class=n>{r['n_test']}</td></tr>")
     cards = []
@@ -310,8 +352,11 @@ article{{background:var(--p);border:1px solid var(--li);border-radius:10px;paddi
 footer{{color:var(--mu);font-size:13px;margin-top:36px}}
 </style></head><body><main>
 <h1>{_esc(c['name'])} · open bench</h1><p class=sub>{_esc(c['mission'])}</p>
-<h2>Leaderboard</h2><div class=wrap><table><tr><th>Task</th><th>#</th><th>Model</th><th style="text-align:right">Score</th><th>Metric</th><th style="text-align:right">n test</th></tr>
-{''.join(rows) or '<tr><td colspan=6>No results yet.</td></tr>'}</table></div>
+<h2>ddd score</h2><p class=sub>Per-task scores normalised to 0-100 (direction-aware) and averaged per model across categories. A relative ranking among the models evaluated here, not an absolute quality score.</p>
+<div class=wrap><table><tr><th class=n>Rank</th><th>Model</th><th class=n>ddd score</th>{sb_head}<th class=n>tasks</th></tr>
+{''.join(sb_rows) or '<tr><td colspan=4>No results yet.</td></tr>'}</table></div>
+<h2>Leaderboard by task</h2><div class=wrap><table><tr><th>Task</th><th>Phase</th><th>#</th><th>Model</th><th style="text-align:right">Score</th><th>Metric</th><th style="text-align:right">n test</th></tr>
+{''.join(rows) or '<tr><td colspan=7>No results yet.</td></tr>'}</table></div>
 <h2>Open benchmark index</h2><p class=sub>Every entry carries the caveat its own description leaves out.</p>
 <div class=grid>{''.join(cards)}</div>
 <footer>Generated {time.strftime('%Y-%m-%d %H:%M')} by the ddd Publishing department.</footer>

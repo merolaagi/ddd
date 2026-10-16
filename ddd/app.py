@@ -105,6 +105,11 @@ def leaderboard():
     return store.leaderboard(TASKS)
 
 
+@app.get("/api/scoreboard")
+def scoreboard():
+    return store.scoreboard(TASKS)
+
+
 @app.get("/api/results")
 def results(task: str | None = None):
     return store.all_results(task)
@@ -151,6 +156,11 @@ def kg_path(a: str, b: str, hops: int = 4):
 @app.get("/api/kg/targets")
 def kg_targets(disease: str, limit: int = 25):
     return _kg(kg.disease_candidate_targets, disease, limit)
+
+
+@app.get("/api/kg/subgraph")
+def kg_subgraph(center: str, depth: int = 1, limit: int = 60, relation: str | None = None):
+    return _kg(kg.subgraph, center, depth, limit, relation)
 
 
 def _kg(fn, *args):
@@ -277,6 +287,7 @@ from .company.paths import PUBLIC, safe_report  # noqa: E402
 from .company.playbooks import open_index  # noqa: E402
 
 app.mount("/public", StaticFiles(directory=PUBLIC, html=True, check_dir=False), name="public")
+app.mount("/static", StaticFiles(directory=STATIC, check_dir=False), name="static")
 
 
 @app.on_event("startup")

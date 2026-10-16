@@ -6,6 +6,7 @@
 <title>ddd Lab</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="/static/vendor/vis-network.min.js"></script>
 <style>
 :root{
   --bg:#f5f4ef; --panel:#ffffff; --ink:#1b1f1c; --muted:#5f6a63; --line:#dedbd1;
@@ -36,6 +37,15 @@ input,textarea{flex:1;min-width:0;width:100%}
 select{max-width:100%}
 button{background:var(--accent);color:var(--panel);border:0;border-radius:6px;padding:8px 14px;font-weight:600;cursor:pointer;font-family:inherit}
 button.ghost{background:transparent;color:var(--accent);border:1px solid var(--accent)}
+.kgo{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:5px;white-space:nowrap}
+.kgo select{width:auto;padding:5px 6px}
+.kgwrap{position:relative;margin-top:12px;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--bg)}
+#kggraph{height:560px;width:100%}
+@media(max-width:700px){#kggraph{height:420px}}
+.kglegend{position:absolute;top:10px;left:10px;display:flex;flex-wrap:wrap;gap:4px 10px;max-width:72%;background:color-mix(in srgb,var(--panel) 88%,transparent);padding:7px 9px;border:1px solid var(--line);border-radius:8px;font-size:11px}
+.kglegend span{display:flex;align-items:center;gap:5px;color:var(--muted)}
+.kglegend i{width:10px;height:10px;border-radius:50%;display:inline-block}
+.kghint{position:absolute;bottom:10px;left:10px;right:10px;font-size:12px;color:var(--muted);background:color-mix(in srgb,var(--panel) 88%,transparent);padding:6px 9px;border-radius:8px;pointer-events:none}
 table{width:100%;border-collapse:collapse;font-size:14px}
 th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}
 th{font-size:12px;color:var(--muted);font-weight:500}
@@ -160,20 +170,30 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:
       <div><h3 class="h3">Output</h3><pre id="armout" class="mono" style="max-height:520px">—</pre></div>
     </div>
   </section>
-  <section class="w6">
+  <section class="w12" id="kgsec">
     <h2>Knowledge graph · PrimeKG</h2>
     <div class="row">
-      <input id="kgq" placeholder="entity name, e.g. metformin">
+      <input id="kgq" placeholder="entity name, e.g. idiopathic pulmonary fibrosis, metformin, STAT3">
+      <button onclick="kgViz()">Visualize</button>
       <button class="ghost" onclick="kg('search')">Search</button>
       <button class="ghost" onclick="kg('summary')">Relations</button>
       <button class="ghost" onclick="kg('neighbors')">Neighbors</button>
     </div>
-    <div class="row" style="margin-top:8px">
-      <input id="kgb" placeholder="second entity, or a disease for targets">
+    <div class="row" style="margin-top:8px;align-items:center">
+      <input id="kgb" placeholder="second entity, or a disease for Targets" style="flex:1">
       <button class="ghost" onclick="kg('path')">Path</button>
       <button class="ghost" onclick="kg('targets')">Targets</button>
+      <label class="kgo">depth
+        <select id="kgdepth"><option value="1">1</option><option value="2">2</option></select></label>
+      <label class="kgo">max
+        <select id="kglimit"><option>40</option><option selected>60</option><option>100</option><option>150</option></select></label>
     </div>
-    <pre id="kgout" class="mono">—</pre>
+    <div class="kgwrap">
+      <div id="kggraph"></div>
+      <div id="kglegend" class="kglegend"></div>
+      <div id="kghint" class="kghint">Enter an entity and press <b>Visualize</b>. Double-click a node to expand it; the center node is ringed.</div>
+    </div>
+    <pre id="kgout" class="mono" style="display:none">—</pre>
   </section>
   <section class="w6">
     <h2>Tasks</h2>
@@ -198,8 +218,8 @@ async function init(){
     `<span class="pill ${models.some(m=>m.startsWith('ollama:'))?'ok':'off'}">Ollama ${models.filter(m=>m.startsWith('ollama:')).length} models</span>`;
   $("task").innerHTML = tasks.map(t => `<option value="${t.id}" ${t.available?'':'disabled'}>${esc(t.id)} — ${esc(t.name)}</option>`).join("");
   $("model").innerHTML = models.map(m => `<option>${esc(m)}</option>`).join("");
-  $("tasks").innerHTML = `<tr><th>Task</th><th>Domain</th><th>Metric</th></tr>` + tasks.map(t =>
-    `<tr><td><b>${esc(t.id)}</b> <span class="tag">${t.split}</span>${t.cached?'':' <span class="tag">not downloaded</span>'}<br><span class="muted">${esc(t.name)}</span><div class="caveat">${esc(t.caveat)}</div></td><td>${esc(t.domain)}</td><td class="mono nowrap">${t.primary_metric} ${t.higher_is_better?'↑':'↓'}</td></tr>`).join("");
+  $("tasks").innerHTML = `<tr><th>Task</th><th>Phase</th><th>Metric</th></tr>` + tasks.map(t =>
+    `<tr><td><b>${esc(t.id)}</b> <span class="tag">${esc(t.source||'')}</span> <span class="tag">${t.split}</span>${t.cached?'':' <span class="tag">not downloaded</span>'}<br><span class="muted">${esc(t.name)}</span><div class="caveat">${esc(t.caveat)}</div></td><td><span class="muted" style="font-size:12px">${esc(t.category||t.domain)}</span><br>${esc(t.phase||'—')}</td><td class="mono nowrap">${t.primary_metric} ${t.higher_is_better?'↑':'↓'}</td></tr>`).join("");
   loadBoard(); pollJobs();
 }
 
@@ -248,9 +268,92 @@ async function kg(kind){
   const a = encodeURIComponent($("kgq").value), b = encodeURIComponent($("kgb").value);
   const url = {search:`/api/kg/search?q=${a}`, summary:`/api/kg/summary?name=${a}`, neighbors:`/api/kg/neighbors?name=${a}`,
                path:`/api/kg/path?a=${a}&b=${b}`, targets:`/api/kg/targets?disease=${b||a}`}[kind];
+  $("kgout").style.display = "block";
   $("kgout").textContent = "…";
   try{ $("kgout").textContent = JSON.stringify(await api(url), null, 2); }
   catch(e){ $("kgout").textContent = e.message; }
+}
+
+const KG_COLORS = {
+  Disease:"#d9544d", Gene:"#1f6f5c", Drug:"#3b6ea5", Phenotype:"#9a5b00",
+  Pathway:"#7d53a8", BioProcess:"#2f8f83", MolFunction:"#b07d2b", CellComponent:"#4a7c3f",
+  Anatomy:"#a0506e", Exposure:"#657a70", Other:"#8a938c"
+};
+let kgNet = null, kgNodes = null, kgEdges = null;
+function cssvar(n){ return getComputedStyle(document.body).getPropertyValue(n).trim(); }
+
+async function kgViz(){
+  const center = $("kgq").value.trim();
+  if(!center) return;
+  const depth = $("kgdepth").value, limit = $("kglimit").value;
+  $("kghint").textContent = "Loading…"; $("kghint").style.display = "block";
+  try{
+    const g = await api(`/api/kg/subgraph?center=${encodeURIComponent(center)}&depth=${depth}&limit=${limit}`);
+    if(!g.found){ $("kghint").textContent = `No entity named "${center}" in the graph. Try Search to find the exact name.`; return; }
+    renderGraph(g);
+    $("kghint").textContent = `${g.counts.nodes} nodes · ${g.counts.edges} links. Double-click a node to expand it.`;
+  }catch(e){ $("kghint").textContent = e.message; }
+}
+
+function renderGraph(g){
+  const used = {};
+  const nodes = g.nodes.map(n => {
+    used[n.label] = KG_COLORS[n.label] || KG_COLORS.Other;
+    return {
+      id: n.id, label: n.name, title: `${n.name} (${n.label})`, group: n.label,
+      color: {background: used[n.label], border: n.center ? cssvar("--ink") : used[n.label],
+              highlight: {background: used[n.label], border: cssvar("--ink")}},
+      borderWidth: n.center ? 4 : 1, size: n.center ? 26 : 16,
+      font: {color: cssvar("--ink"), size: n.center ? 16 : 13, face: "IBM Plex Sans"}
+    };
+  });
+  const edges = g.edges.map((e, i) => ({
+    id: "e" + i, from: e.source, to: e.target, label: e.rel,
+    color: {color: cssvar("--line"), highlight: cssvar("--accent")},
+    font: {color: cssvar("--muted"), size: 10, strokeWidth: 3, strokeColor: cssvar("--bg")},
+    smooth: {type: "dynamic"}, length: 170
+  }));
+  kgNodes = new vis.DataSet(nodes); kgEdges = new vis.DataSet(edges);
+  const opts = {
+    physics: {barnesHut: {gravitationalConstant: -9000, springLength: 150, centralGravity: 0.25}, stabilization: {iterations: 220}},
+    nodes: {shape: "dot", borderWidthSelected: 4},
+    edges: {arrows: {to: {enabled: false}}, selectionWidth: 2},
+    interaction: {hover: true, tooltipDelay: 120, navigationButtons: false, keyboard: false}
+  };
+  if(kgNet) kgNet.destroy();
+  kgNet = new vis.Network($("kggraph"), {nodes: kgNodes, edges: kgEdges}, opts);
+  kgNet.on("doubleClick", async p => {
+    if(!p.nodes.length) return;
+    const n = kgNodes.get(p.nodes[0]);
+    await expandNode(n.label === undefined ? p.nodes[0] : n.id, n.label);
+  });
+  $("kglegend").innerHTML = Object.entries(used).sort().map(([k, c]) =>
+    `<span><i style="background:${c}"></i>${esc(k)}</span>`).join("");
+}
+
+async function expandNode(id, _label){
+  const n = kgNodes.get(id);
+  if(!n) return;
+  $("kghint").textContent = `Expanding ${n.label}…`;
+  try{
+    const g = await api(`/api/kg/subgraph?center=${encodeURIComponent(n.label)}&depth=1&limit=40`);
+    if(!g.found) return;
+    const colorFor = t => KG_COLORS[t] || KG_COLORS.Other;
+    g.nodes.forEach(nd => {
+      if(!kgNodes.get(nd.id)) kgNodes.add({
+        id: nd.id, label: nd.name, title: `${nd.name} (${nd.label})`, group: nd.label,
+        color: {background: colorFor(nd.label), border: colorFor(nd.label)},
+        size: 16, font: {color: cssvar("--ink"), size: 13}
+      });
+    });
+    g.edges.forEach(e => {
+      const eid = `x${e.source}_${e.target}_${e.rel}`;
+      if(!kgEdges.get(eid)) kgEdges.add({id: eid, from: e.source, to: e.target, label: e.rel,
+        color: {color: cssvar("--line"), highlight: cssvar("--accent")},
+        font: {color: cssvar("--muted"), size: 10, strokeWidth: 3, strokeColor: cssvar("--bg")}});
+    });
+    $("kghint").textContent = `${kgNodes.length} nodes · ${kgEdges.length} links. Double-click any node to expand further.`;
+  }catch(e){ $("kghint").textContent = e.message; }
 }
 init();
 

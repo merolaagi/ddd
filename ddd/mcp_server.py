@@ -88,6 +88,13 @@ def leaderboard(task: str | None = None) -> dict:
 
 
 @mcp.tool()
+def scoreboard() -> dict:
+    """DDDBench-style aggregate: each model's 0-100 ddd score, broken down by
+    category, averaged over all tasks run. A relative ranking, not absolute quality."""
+    return store.scoreboard(TASKS)
+
+
+@mcp.tool()
 def kg_search(name: str, limit: int = 10) -> list[dict]:
     """Find knowledge-graph entities whose name contains the text."""
     return kg.search(name, limit)
@@ -110,6 +117,13 @@ def kg_relation_summary(name: str) -> list[dict]:
 def kg_path(a: str, b: str, max_hops: int = 4) -> dict:
     """Shortest mechanistic path between two entities (e.g. a drug and a disease)."""
     return kg.path(a, b, max_hops)
+
+
+@mcp.tool()
+def kg_subgraph(center: str, depth: int = 1, limit: int = 60, relation: str | None = None) -> dict:
+    """Nodes and edges around an entity, shaped for graph rendering (the Lab's graph view
+    uses this). depth 1 = direct neighbors, 2 also expands one more hop."""
+    return kg.subgraph(center, depth, limit, relation)
 
 
 @mcp.tool()

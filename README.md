@@ -1,4 +1,4 @@
-# ddd · v0.4.2
+# ddd · v0.6.0
 
 **A headless drug-discovery intelligence company on one Mac.** No staff: six
 departments run as agents executing playbooks on a schedule or on request. The
@@ -20,7 +20,7 @@ Every release ships as `ddd-vX.Y.Z.tar.gz`. The same line installs the first
 time and upgrades later; data, `.venv` and `.env` are kept.
 
 ```
-cd ~/Downloads && tar -xzf ddd-v0.4.2.tar.gz && bash ddd-v0.4.2/install.sh && cd ~/Sites/ddd && ./serve.sh && git push
+cd ~/Downloads && tar -xzf ddd-v0.6.0.tar.gz && bash ddd-v0.6.0/install.sh && cd ~/Sites/ddd && ./serve.sh && git push
 ```
 
 ## The company
@@ -86,11 +86,27 @@ Mac to browse your home network.
 
 ## Benchmarks
 
-MoleculeNet sets (BBBP, ESOL, Lipophilicity, ClinTox, BACE, HIV) with a
-deterministic Bemis-Murcko scaffold split; `ogbg-molhiv` with OGB's official
-split after `pip install ogb`. Each task carries a known caveat. Scaffold
-splits test generalisation but are not decontamination; time-split tasks are
-planned. Models: `rf`, `logreg` and `ollama:<name>` (zero-shot).
+21 tasks, DDDBench-style: each is tagged with a drug-R&D **phase** (target
+discovery → hit ID → hit-to-lead → lead-opt ADME → lead-opt safety → clinical)
+and a **category**, and carries a known caveat.
+
+- **MoleculeNet** (BBBP, ESOL, Lipophilicity, ClinTox, BACE, HIV) and
+  `ogbg-molhiv` (OGB official split, after `pip install ogb`).
+- **TDC ADMET/safety** (14 tasks): Caco-2, AqSolDB solubility, BBB, oral
+  bioavailability, P-gp, plasma protein binding, CYP3A4/2D6/2C9 inhibition,
+  hERG, Ames, DILI, half-life, hepatocyte clearance. Downloaded from Harvard
+  Dataverse on first use; metrics follow TDC (MAE, Spearman, AUROC).
+
+All sets are re-split here with a deterministic Bemis-Murcko scaffold split, so
+scores test generalisation but are **not** comparable to TDC's own 5-seed
+leaderboard, and scaffold splitting is not decontamination. Models: `rf`,
+`logreg` and `ollama:<name>` (zero-shot).
+
+**ddd score** (`/api/scoreboard`, MCP `scoreboard`, and the public page): each
+task's models are min-max normalised to 0-100 (direction-aware) and averaged
+per model across categories — a DDDBench-style aggregate. It's a *relative*
+ranking among the models run, not an absolute quality score; only tasks with
+2+ scored models count.
 
 ## Open benchmark index
 
@@ -103,6 +119,16 @@ required); they're stored in `data/benchmark_index.json`.
 A six-scale scaffold (molecular → organism) with biological age as the
 conditioning variable. The molecular scale is live, the intracellular scale
 links to Fate Memory Lab, the rest are stubs with a fixed contract.
+
+## Knowledge graph viewer
+
+The Lab's **Knowledge graph** panel renders PrimeKG subgraphs interactively,
+in-app (no external Neo4j Browser): type an entity (disease, gene, drug) and
+press **Visualize** for a force-directed graph coloured by node type, with the
+centre node ringed and edges labelled by relation. Double-click any node to
+expand its neighbours. Served by `/api/kg/subgraph` and the MCP `kg_subgraph`
+tool; the vis-network library is vendored at `static/vendor/`, so it works
+offline with no CDN.
 
 ## Knowledge graph (optional)
 

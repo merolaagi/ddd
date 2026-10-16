@@ -27,10 +27,17 @@ def metrics(kind, y, p):
         return {"auroc": round(float(roc_auc_score(y, p)), 4),
                 "auprc": round(float(average_precision_score(y, p)), 4),
                 "n_scored": int(len(y))}
-    return {"rmse": round(math.sqrt(mean_squared_error(y, p)), 4),
-            "mae": round(float(mean_absolute_error(y, p)), 4),
-            "r2": round(float(r2_score(y, p)), 4),
-            "n_scored": int(len(y))}
+    out = {"rmse": round(math.sqrt(mean_squared_error(y, p)), 4),
+           "mae": round(float(mean_absolute_error(y, p)), 4),
+           "r2": round(float(r2_score(y, p)), 4),
+           "n_scored": int(len(y))}
+    if len(y) > 2:
+        from scipy.stats import spearmanr
+        rho = spearmanr(y, p).correlation
+        out["spearman"] = round(float(rho), 4) if rho == rho else None
+    else:
+        out["spearman"] = None
+    return out
 
 
 def get_split(task, df):

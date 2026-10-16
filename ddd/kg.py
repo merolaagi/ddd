@@ -116,3 +116,41 @@ def disease_drugs(disease: str, limit: int = 15):
         match (d:Disease) where d.name = $disease with d limit 1
         match (d)-[r:REL]-(x:Drug)
         return x.name as drug, r.display as relation limit $limit""", disease=disease, limit=limit)
+
+
+def subgraph(center: str, depth: int = 1, limit: int = 60, relation: str | None = None):
+    """Nodes + edges around a center entity, shaped for graph rendering.
+    depth 1 = direct neighbors; depth 2 also expands one hop from those."""
+    depth = max(1, min(int(depth), 2))
+    limit = max(5, min(int(limit), 250))
+    rows = _q(f"""
+        match (c:Entity) where toLower(c.name) = toLower($center) with c limit 1
+        match p = (c)-[:REL*1..{depth}]-(m:Entity)
+        with c, relationships(p) as rels, nodes(p) as ns
+        unwind range(0, size(rels)-1) as i
+        with ns[i] as a, ns[i+1] as b, rels[i] as r
+        where $relation is null or r.display = $relation or r.relation = $relation
+        return distinct
+          a.idx as a_idx, a.name as a_name, a.type as a_type,
+          b.idx as b_idx, b.name as b_name, b.type as b_type,
+          r.display as rel
+        limit $limit""", center=center, relation=relation, limit=limit)
+    if not rows:
+        return {"center": center, "found": False, "nodes": [], "edges": []}
+    nodes, edges, seen = {}, [], set()
+    center_l = center.lower()
+    for row in rows:
+        for pfx in ("a", "b"):
+            idx = row[f"{pfx}_idx"]
+            if idx not in nodes:
+                nm = row[f"{pfx}_name"]
+                nodes[idx] = {"id": idx, "name": nm, "type": row[f"{pfx}_type"],
+                              "label": TYPE_LABEL.get(row[f"{pfx}_type"], "Other"),
+                              "center": nm.lower() == center_l}
+        key = (row["a_idx"], row["b_idx"], row["rel"])
+        rkey = tuple(sorted((row["a_idx"], row["b_idx"]))) + (row["rel"],)
+        if rkey not in seen:
+            seen.add(rkey)
+            edges.append({"source": row["a_idx"], "target": row["b_idx"], "rel": row["rel"]})
+    return {"center": center, "found": True, "nodes": list(nodes.values()), "edges": edges,
+            "counts": {"nodes": len(nodes), "edges": len(edges)}}
