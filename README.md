@@ -1,4 +1,4 @@
-# ddd · v0.6.0
+# ddd · v0.6.1
 
 **A headless drug-discovery intelligence company on one Mac.** No staff: six
 departments run as agents executing playbooks on a schedule or on request. The
@@ -70,7 +70,10 @@ request is logged to `logs/mcp.log` with the token redacted and, when refused,
 the reason (no header, wrong value, and so on).
 
 The server refuses to start with a public host and no token. The web UI
-(47520) has no auth: keep it local.
+(47520) has no auth **unless** you set `DDD_WEB_PASSWORD` in `.env`: with it
+set, every web request needs HTTP Basic auth (any username, that password),
+so the UI can be exposed over the tunnel safely. Left empty, the UI stays
+open for localhost-only use.
 
 ## Tools Armory
 

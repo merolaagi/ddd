@@ -1,13 +1,16 @@
 """Web UI + JSON API for the bench."""
 from __future__ import annotations
 
+import base64
+import hmac
+import os
 import threading
 import traceback
 import uuid
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi.responses import FileResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -27,6 +30,31 @@ app = FastAPI(title="ddd", version=__version__)
 STATIC = Path(__file__).resolve().parent.parent / "static"
 JOBS: dict[str, dict] = {}
 _lock = threading.Lock()
+
+_WEB_PASSWORD = os.environ.get("DDD_WEB_PASSWORD", "").strip()
+
+
+@app.middleware("http")
+async def _basic_auth(request, call_next):
+    """When DDD_WEB_PASSWORD is set, require HTTP Basic auth on every request.
+    Lets the whole web UI be exposed over the tunnel safely. Any username is
+    accepted; the password must match. With no password set, the app stays
+    open (localhost-only use) exactly as before."""
+    if _WEB_PASSWORD:
+        header = request.headers.get("authorization", "")
+        ok = False
+        if header.startswith("Basic "):
+            try:
+                decoded = base64.b64decode(header[6:]).decode("utf-8", "replace")
+                _, _, pw = decoded.partition(":")
+                ok = hmac.compare_digest(pw, _WEB_PASSWORD)
+            except Exception:
+                ok = False
+        if not ok:
+            return Response(status_code=401, content='{"error":"unauthorized"}',
+                            media_type="application/json",
+                            headers={"WWW-Authenticate": 'Basic realm="ddd"'})
+    return await call_next(request)
 
 
 class RunReq(BaseModel):
