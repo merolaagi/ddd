@@ -71,6 +71,7 @@ def hypothesis(a: str, b: str, max_hops: int = 4) -> dict:
         match (x:Entity {idx:$a})-[:REL]-(m:Entity)-[:REL]-(y:Entity {idx:$b})
         where m.idx <> $a and m.idx <> $b
         with distinct m, count{ (m)-[:REL]-() } as md
+        where md <= 5000
         return count(m) as common,
                sum(1.0/log(md + 2.0)) as adamic_adar,
                [x in collect({name:m.name, type:m.type, degree:md})[..15] | x] as shared
@@ -107,9 +108,14 @@ def hypothesis(a: str, b: str, max_hops: int = 4) -> dict:
     }
 
 
-def predict_links(entity: str, target: str = "gene", k: int = 20) -> dict:
+def predict_links(entity: str, target: str = "gene", k: int = 20,
+                  hub_cap: int = 800, shared_cap: int = 400) -> dict:
     """Rank NOVEL target-type nodes that the graph implies should link to
-    `entity` but currently don't — ordered by Adamic-Adar. New hypotheses."""
+    `entity` but currently don't — ordered by Adamic-Adar. New hypotheses.
+
+    Bounded for high-degree entities: we take `entity`'s neighbours, drop hubs
+    (degree > hub_cap, which are both uninformative and explosive), keep the
+    `shared_cap` most specific, and only then expand to candidate nodes."""
     label = LABELS.get(target.lower())
     if not label:
         return {"error": f"unknown target type '{target}'. Use one of: {', '.join(sorted(set(LABELS)))}"}
@@ -119,19 +125,24 @@ def predict_links(entity: str, target: str = "gene", k: int = 20) -> dict:
     k = max(1, min(int(k), 100))
 
     rows = kg._q(f"""
-        match (d:Entity {{idx:$idx}})-[:REL]-(m:Entity)-[:REL]-(c:{label})
+        match (d:Entity {{idx:$idx}})-[:REL]-(m:Entity)
+        with d, m, count{{ (m)-[:REL]-() }} as md
+        where md <= $hub_cap
+        with d, m, md order by md asc limit $shared_cap
+        match (m)-[:REL]-(c:{label})
         where c.idx <> $idx and NOT EXISTS {{ (d)-[:REL]-(c) }}
-        with c, m, count{{ (m)-[:REL]-() }} as md
         with c, sum(1.0/log(md + 2.0)) as aa, count(distinct m) as common
         optional match (c)-[:REL]-(drug:Drug)
-        return c.name as name, c.type as type, common, round(aa,3) as adamic_adar,
+        return c.name as name, c.type as type, common, round(aa, 3) as adamic_adar,
                count(distinct drug) as known_drugs
-        order by aa desc limit $k""", idx=ne["idx"], k=k)
+        order by aa desc limit $k""",
+        idx=ne["idx"], k=k, hub_cap=int(hub_cap), shared_cap=int(shared_cap))
 
     return {
         "entity": {"name": ne["name"], "type": ne["type"], "degree": ne["degree"]},
         "target_type": label,
-        "note": "Novel (not already linked) nodes ranked by Adamic-Adar over the shared neighbourhood. "
+        "note": "Novel (not already linked) nodes ranked by Adamic-Adar over the shared neighbourhood "
+                f"(hubs over degree {hub_cap} dropped; top {shared_cap} most-specific shared neighbours). "
                 "Topological signal, not validated causality.",
         "predictions": rows,
     }
