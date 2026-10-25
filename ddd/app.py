@@ -191,6 +191,47 @@ def kg_subgraph(center: str, depth: int = 1, limit: int = 60, relation: str | No
     return _kg(kg.subgraph, center, depth, limit, relation)
 
 
+@app.get("/api/kg/provenance")
+def kg_provenance():
+    return _kg(kg.provenance)
+
+
+@app.get("/api/sources/opentargets/disease")
+def ot_disease(disease: str, size: int = 25, write: bool = True):
+    from .sources import opentargets
+    try:
+        return opentargets.enrich_disease(disease, size, write)
+    except Exception as e:
+        raise HTTPException(502, f"Open Targets: {str(e)[:200]}")
+
+
+@app.get("/api/sources/opentargets/target_drugs")
+def ot_target_drugs(symbol: str, size: int = 25):
+    from .sources import opentargets
+    try:
+        return opentargets.target_known_drugs(symbol, size)
+    except Exception as e:
+        raise HTTPException(502, f"Open Targets: {str(e)[:200]}")
+
+
+@app.get("/api/sources/chembl/target")
+def chembl_target(symbol: str, standard_type: str = "IC50", limit: int = 50, write: bool = True):
+    from .sources import chembl
+    try:
+        return chembl.enrich_target(symbol, standard_type, limit, write)
+    except Exception as e:
+        raise HTTPException(502, f"ChEMBL: {str(e)[:200]}")
+
+
+@app.get("/api/sources/chembl/molecule")
+def chembl_molecule(name: str):
+    from .sources import chembl
+    try:
+        return chembl.molecule(name)
+    except Exception as e:
+        raise HTTPException(502, f"ChEMBL: {str(e)[:200]}")
+
+
 def _kg(fn, *args):
     try:
         return fn(*args)

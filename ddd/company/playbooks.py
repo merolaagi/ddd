@@ -180,7 +180,7 @@ def bench_full_sweep(ctx, include_llm: bool = False, llm_sample: int = 50):
 
 # ---------------------------------------------------------------- Target biology
 
-def bio_target_dossier(ctx, disease: str, top: int = 12):
+def bio_target_dossier(ctx, disease: str, top: int = 12, enrich: bool = True):
     st = kg.status()
     if not st.get("connected"):
         err = (st.get("error") or "").lower()
@@ -199,20 +199,68 @@ def bio_target_dossier(ctx, disease: str, top: int = 12):
     rel = kg.relation_summary(name)
     targets = kg.disease_candidate_targets(name, top)
     drugs = kg.disease_drugs(name)
-    lines = [f"# Target dossier: {name}", "", f"Query: '{disease}' · source: PrimeKG in Neo4j", "",
-             "## What the graph knows", "", "| Relation | Linked type | Count |", "|---|---|---|"]
+
+    # Enrich with Open Targets evidence scores (best-effort; needs internet).
+    ot_scores, ot_note, ot_written = {}, "", 0
+    if enrich:
+        from ..sources import opentargets
+        ctx.log("Fetching Open Targets association scores")
+        try:
+            r = opentargets.enrich_disease(disease, size=max(top, 25))
+            if r.get("efo_id"):
+                ot_scores = {t["symbol"]: t["score"] for t in r.get("targets", [])}
+                ot_written = r.get("written", 0)
+                ot_note = f"Open Targets {r['efo_id']} · {len(ot_scores)} scored targets · {ot_written} written to graph"
+            else:
+                ot_note = "Open Targets had no match for this disease"
+        except Exception as e:
+            ot_note = f"Open Targets unavailable ({str(e)[:80]})"
+            ctx.log("  " + ot_note)
+
+    # Union of PrimeKG candidates and Open Targets' top targets, ranked by OT score.
+    genes = {t["gene"]: {"gene": t["gene"], "n_drugs": t.get("n_drugs", 0),
+                         "n_phenotypes": t.get("n_phenotypes", 0)} for t in targets}
+    for sym in ot_scores:
+        genes.setdefault(sym, {"gene": sym, "n_drugs": 0, "n_phenotypes": 0})
+    for g in genes.values():
+        g["ot_score"] = ot_scores.get(g["gene"])
+    ranked = sorted(genes.values(),
+                    key=lambda g: (g["ot_score"] if g["ot_score"] is not None else -1, g["n_drugs"]),
+                    reverse=True)[:top]
+
+    # ChEMBL potent actives for the top few targets (best-effort).
+    chembl_counts = {}
+    if enrich:
+        from ..sources import chembl
+        for g in ranked[:5]:
+            try:
+                res = chembl.target_actives(g["gene"], limit=50)
+                chembl_counts[g["gene"]] = res.get("count", 0) if res.get("found") else None
+            except Exception:
+                chembl_counts[g["gene"]] = None
+
+    src = "PrimeKG" + (" + Open Targets" if ot_scores else "") + (" + ChEMBL" if chembl_counts else "")
+    lines = [f"# Target dossier: {name}", "", f"Query: '{disease}' · sources: {src}", ""]
+    if ot_note:
+        lines += [f"_{ot_note}._", ""]
+    lines += ["## What the graph knows", "", "| Relation | Linked type | Count |", "|---|---|---|"]
     lines += [f"| {r['relation']} | {r['target_type']} | {r['count']} |" for r in rel[:15]]
     lines += ["", "## Candidate targets", "",
-              "Genes linked to the disease, ranked by how many drugs already touch them (a druggability proxy) "
-              "and phenotype links. Novelty runs the other way: low drug counts are less validated but less crowded.", "",
-              "| # | Gene | Drugs touching it | Phenotype links | Example drugs |", "|---|---|---|---|---|"]
-    for i, t in enumerate(targets, 1):
-        ex = ", ".join(kg.gene_drugs(t["gene"], 4))
-        lines.append(f"| {i} | {t['gene']} | {t['n_drugs']} | {t['n_phenotypes']} | {ex or '—'} |")
+              "Ranked by **Open Targets association score** (0-1, evidence-weighted) where available, then by "
+              "PrimeKG druggability. OT score is the real target-ranking signal; PrimeKG drug count is a crowding "
+              "proxy; ChEMBL actives counts potent measured compounds (pChEMBL≥6) for the top targets.", "",
+              "| # | Gene | OT score | PrimeKG drugs | Phenotypes | ChEMBL actives |", "|---|---|---|---|---|---|"]
+    for i, g in enumerate(ranked, 1):
+        ot = f"{g['ot_score']:.3f}" if g["ot_score"] is not None else "—"
+        ch = chembl_counts.get(g["gene"])
+        chs = "—" if g["gene"] not in chembl_counts else ("n/a" if ch is None else str(ch))
+        lines.append(f"| {i} | {g['gene']} | {ot} | {g['n_drugs']} | {g['n_phenotypes']} | {chs} |")
     lines += ["", "## Drugs already linked to the disease", ""]
     lines += [f"- {d['drug']} ({d['relation']})" for d in drugs] or ["None in the graph."]
-    lines += ["", "_Graph associations are hypotheses for review, not evidence of efficacy._"]
-    return {"disease": name, "targets": [t["gene"] for t in targets], "linked_drugs": len(drugs)}, lines
+    lines += ["", "_Open Targets scores are evidence-weighted associations, not proof of a causal, druggable target; "
+              "all of this is for review, not efficacy._"]
+    return {"disease": name, "targets": [g["gene"] for g in ranked], "linked_drugs": len(drugs),
+            "ot_scored": len(ot_scores), "ot_written": ot_written}, lines
 
 
 # ---------------------------------------------------------------- Chemistry

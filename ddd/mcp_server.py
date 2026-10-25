@@ -127,6 +127,43 @@ def kg_subgraph(center: str, depth: int = 1, limit: int = 60, relation: str | No
 
 
 @mcp.tool()
+def kg_provenance() -> list[dict]:
+    """Edge counts by source (PrimeKG vs enrichment from Open Targets, ChEMBL)."""
+    return kg.provenance()
+
+
+@mcp.tool()
+def opentargets_disease(disease: str, size: int = 25, write: bool = True) -> dict:
+    """Open Targets evidence-weighted target associations for a disease (score 0-1).
+    By default writes them into the knowledge graph as OpenTargets-sourced edges.
+    Needs internet on the host."""
+    from .sources import opentargets
+    return opentargets.enrich_disease(disease, size, write)
+
+
+@mcp.tool()
+def opentargets_target_drugs(symbol: str, size: int = 25) -> dict:
+    """Known drugs for a target from Open Targets (name, phase, mechanism of action)."""
+    from .sources import opentargets
+    return opentargets.target_known_drugs(symbol, size)
+
+
+@mcp.tool()
+def chembl_target_actives(symbol: str, standard_type: str = "IC50", limit: int = 50, write: bool = True) -> dict:
+    """Potent measured compounds (pChEMBL>=6) for a target from ChEMBL. By default
+    writes Compound-active->Gene edges into the graph. Needs internet on the host."""
+    from .sources import chembl
+    return chembl.enrich_target(symbol, standard_type, limit, write)
+
+
+@mcp.tool()
+def chembl_molecule(name: str) -> dict:
+    """Look up a molecule in ChEMBL by name (ChEMBL id, SMILES, max clinical phase)."""
+    from .sources import chembl
+    return chembl.molecule(name)
+
+
+@mcp.tool()
 def kg_candidate_targets(disease: str, limit: int = 25) -> list[dict]:
     """Naive ranked target list for a disease: associated genes ordered by how many
     drugs already touch them and phenotype links. A starting point, not a verdict."""

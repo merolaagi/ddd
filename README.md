@@ -1,4 +1,4 @@
-# ddd · v0.6.1
+# ddd · v0.7.0
 
 **A headless drug-discovery intelligence company on one Mac.** No staff: six
 departments run as agents executing playbooks on a schedule or on request. The
@@ -16,11 +16,11 @@ through MCP. No paid model APIs.
 
 ## Install, upgrade and run
 
-Every release ships as `ddd-vX.Y.Z.tar.gz`. The same line installs the first
-time and upgrades later; data, `.venv` and `.env` are kept.
+Delivered over git. The same line upgrades in place; data, `.venv` and `.env`
+are kept.
 
 ```
-cd ~/Downloads && tar -xzf ddd-v0.6.0.tar.gz && bash ddd-v0.6.0/install.sh && cd ~/Sites/ddd && ./serve.sh && git push
+cd ~/Sites/ddd && git pull origin main && .venv/bin/pip install -q -r requirements.txt && ./serve.sh
 ```
 
 ## The company
@@ -33,7 +33,7 @@ the focus diseases.
 |---|---|---|
 | Intelligence | Scout | `intel_watchlist_sweep`: recon every watchlist page and diff against the last capture (new/removed endpoints, schema changes, redeploys) · `intel_recon {url}` |
 | Evaluation | Judge | `bench_full_sweep`: every task × every baseline (optionally every Ollama model), flags regressions |
-| Target Biology | Cartographer | `bio_target_dossier {disease}`: ranked targets, linked drugs and graph context from PrimeKG |
+| Target Biology | Cartographer | `bio_target_dossier {disease}`: targets ranked by Open Targets association score, known drugs with ChEMBL activity counts, graph context from PrimeKG |
 | Chemistry | Triage | `chem_molecule_triage {smiles}`: properties, six baseline predictions, red flags |
 | Discovery Programs | Lead | `discovery_program {disease, molecules}`: Scout → Chemist → Evaluator → Curator, end to end |
 | Publishing | Herald | `pub_weekly_digest`: the week's runs, repo activity for the index, rebuilds the public page |
@@ -53,7 +53,8 @@ report gets a short executive summary written by that local model.
 
 The MCP server exposes `company_overview`, `company_run`,
 `company_run_status`, `company_runs`, `company_report`, `company_schedule`,
-`company_update_charter`, plus the lower-level bench, KG, armory, index,
+`company_update_charter`, plus the lower-level bench, KG, knowledge-source
+enrichment (`opentargets_*`, `chembl_*`, `kg_provenance`), armory, index,
 program and Virtual Cell tools.
 
 To reach it from claude.ai it must be public, so it needs a token:
@@ -132,6 +133,28 @@ centre node ringed and edges labelled by relation. Double-click any node to
 expand its neighbours. Served by `/api/kg/subgraph` and the MCP `kg_subgraph`
 tool; the vis-network library is vendored at `static/vendor/`, so it works
 offline with no CDN.
+
+## Knowledge sources · enrichment
+
+The PrimeKG graph is a fixed 2023 snapshot. Two live public APIs enrich it
+on demand — no bulk downloads, so it stays disk-safe — writing new nodes and
+edges back into Neo4j tagged with their source, so provenance is always
+visible.
+
+- **Open Targets** (GraphQL): disease → target associations with the
+  overall association score, and each target's known drugs. The target
+  dossier ranks by this score when `enrich` is on (the default).
+- **ChEMBL** (REST): a target's measured actives (pChEMBL ≥ 6) and molecule
+  lookups, so a dossier shows how much real bioactivity data backs each top
+  target.
+
+From the Lab's **Knowledge sources** panel, the API
+(`/api/sources/opentargets/disease`, `/opentargets/target_drugs`,
+`/chembl/target`, `/chembl/molecule`) or MCP (`opentargets_disease`,
+`opentargets_target_drugs`, `chembl_target_actives`, `chembl_molecule`).
+`/api/kg/provenance` (MCP `kg_provenance`) reports edge counts by source, so
+PrimeKG, Open Targets and ChEMBL contributions stay distinct. Enrichment is
+best-effort: if an API is unreachable the dossier falls back to PrimeKG alone.
 
 ## Knowledge graph (optional)
 

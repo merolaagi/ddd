@@ -195,6 +195,18 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:
     </div>
     <pre id="kgout" class="mono" style="display:none">—</pre>
   </section>
+  <section class="w12" id="srcsec">
+    <h2>Knowledge sources · enrichment</h2>
+    <p class="muted" style="font-size:13px;margin:-4px 0 12px">Pull evidence from public APIs into your graph, on demand — no bulk downloads. Open Targets adds evidence-weighted target-disease scores; ChEMBL adds potent measured compounds per target. Writes are tagged by source.</p>
+    <div class="row">
+      <input id="otdis" placeholder="disease, e.g. idiopathic pulmonary fibrosis">
+      <button onclick="enrichOT()">Enrich from Open Targets</button>
+      <input id="chsym" placeholder="gene/target, e.g. STAT3" style="max-width:220px">
+      <button class="ghost" onclick="enrichCh()">ChEMBL actives</button>
+      <button class="ghost" onclick="loadProv()">Graph provenance</button>
+    </div>
+    <pre id="srcout" class="mono" style="max-height:360px">Enrich a disease or target to grow the knowledgebase. Needs internet on the Mac.</pre>
+  </section>
   <section class="w6">
     <h2>Tasks</h2>
     <div class="scroll"><table id="tasks"></table></div>
@@ -354,6 +366,23 @@ async function expandNode(id, _label){
     });
     $("kghint").textContent = `${kgNodes.length} nodes · ${kgEdges.length} links. Double-click any node to expand further.`;
   }catch(e){ $("kghint").textContent = e.message; }
+}
+async function enrichOT(){
+  const d = $("otdis").value.trim(); if(!d) return;
+  $("srcout").textContent = "Querying Open Targets…";
+  try{ $("srcout").textContent = JSON.stringify(await api("/api/sources/opentargets/disease?disease="+encodeURIComponent(d)+"&size=25"), null, 2); }
+  catch(e){ $("srcout").textContent = e.message; }
+}
+async function enrichCh(){
+  const s = $("chsym").value.trim(); if(!s) return;
+  $("srcout").textContent = "Querying ChEMBL…";
+  try{ $("srcout").textContent = JSON.stringify(await api("/api/sources/chembl/target?symbol="+encodeURIComponent(s)+"&limit=50"), null, 2); }
+  catch(e){ $("srcout").textContent = e.message; }
+}
+async function loadProv(){
+  $("srcout").textContent = "…";
+  try{ $("srcout").textContent = "Edges by source:\n" + JSON.stringify(await api("/api/kg/provenance"), null, 2); }
+  catch(e){ $("srcout").textContent = e.message; }
 }
 init();
 

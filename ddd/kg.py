@@ -154,3 +154,43 @@ def subgraph(center: str, depth: int = 1, limit: int = 60, relation: str | None 
             edges.append({"source": row["a_idx"], "target": row["b_idx"], "rel": row["rel"]})
     return {"center": center, "found": True, "nodes": list(nodes.values()), "edges": edges,
             "counts": {"nodes": len(nodes), "edges": len(edges)}}
+
+
+# ---------------------------------------------------------------------------
+# Enrichment writes: attach external evidence (Open Targets, ChEMBL) onto the
+# graph. New nodes get a string idx like "ext:OpenTargets:STAT3" so they never
+# collide with PrimeKG's integer idx, and existing PrimeKG nodes are reused by
+# case-insensitive name match. Every external edge carries source + score.
+
+def _label_for(type_name: str) -> str:
+    return TYPE_LABEL.get(type_name, "Other")
+
+
+def ensure_node(name: str, type_name: str, source: str, props: dict | None = None) -> str:
+    """Return the idx of a node for (name,type), reusing a PrimeKG node by name
+    if present, else creating an external one. Idempotent."""
+    label = _label_for(type_name)
+    rows = _q(f"match (n:{label}) where toLower(n.name)=toLower($name) return n.idx as idx limit 1", name=name)
+    if rows:
+        return rows[0]["idx"]
+    ext_idx = f"ext:{source}:{label}:{name}"
+    extra = props or {}
+    _q(f"""merge (n:Entity {{idx:$idx}})
+           set n:{label}, n.name=$name, n.type=$type, n.source=$source, n.external=true, n += $extra""",
+       idx=ext_idx, name=name, type=type_name, source=source, extra=extra)
+    return ext_idx
+
+
+def merge_edge(a_idx, b_idx, relation: str, display: str, source: str, props: dict | None = None):
+    base = {"relation": relation, "display": display, "source": source}
+    base.update(props or {})
+    _q("""match (a:Entity {idx:$a}) match (b:Entity {idx:$b})
+          merge (a)-[r:REL {relation:$relation, source:$source}]->(b)
+          set r += $props""", a=a_idx, b=b_idx, relation=relation, source=source, props=base)
+
+
+def provenance() -> list[dict]:
+    """How many edges came from each source (PrimeKG vs enrichment)."""
+    return _q("""match ()-[r:REL]->()
+                 return coalesce(r.source,'PrimeKG') as source, count(*) as edges
+                 order by edges desc""")
