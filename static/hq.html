@@ -45,10 +45,10 @@ nav a.on{background:var(--accent-soft);color:var(--accent)}
 .theme-btn:hover{border-color:var(--accent);color:var(--accent)}
 
 /* hero */
-.hero{padding:48px 0 20px}
-.hero h1,#mission{font-weight:500;font-size:20px;line-height:1.42;letter-spacing:0;margin:0 0 14px;max-width:46ch}
+
+#mission{font-size:14.5px;font-weight:500;line-height:1.55;margin:0 0 6px;max-width:70ch;color:var(--ink)}.about-wrap{padding:22px 0 2px}.about>summary{cursor:pointer;color:var(--accent);font-weight:600;font-size:14px;width:max-content}.about[open]>summary{margin-bottom:12px}
 .hero p{color:var(--muted);margin:0;max-width:64ch;font-size:15px;line-height:1.62}
-@media(max-width:520px){.hero h1,#mission{font-size:18px}}
+
 details.charter{margin-top:18px}
 details.charter summary{cursor:pointer;color:var(--accent);font-size:14px;font-weight:500}
 .cgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin-top:14px}
@@ -226,10 +226,11 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:
 </div></header>
 
 <div class="wrap">
-  <section class="hero">
-    <h1 id="mission">…</h1>
-    <p id="model"></p>
-    <details class="charter"><summary>Charter: scope, non-goals, principles, watchlist</summary>
+  <section class="about-wrap">
+    <details class="about">
+      <summary>About ddd</summary>
+      <p id="mission"></p>
+      <p id="model" class="muted" style="font-size:13px;margin:2px 0 12px"></p>
       <div class="cgrid" id="charterGrid"></div>
       <details style="margin-top:12px"><summary class="muted" style="cursor:pointer;font-size:13px">Edit charter (JSON)</summary>
         <textarea id="charterEdit" style="min-height:260px;margin-top:8px"></textarea>
