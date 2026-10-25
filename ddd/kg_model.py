@@ -124,19 +124,22 @@ def predict_links(entity: str, target: str = "gene", k: int = 20,
         return {"error": f"'{entity}' is not in the graph. Try Search for the exact name."}
     k = max(1, min(int(k), 100))
 
-    rows = kg._q(f"""
-        match (d:Entity {{idx:$idx}})-[:REL]-(m:Entity)
-        with d, m, count{{ (m)-[:REL]-() }} as md
-        where md <= $hub_cap
-        with d, m, md order by md asc limit $shared_cap
-        match (m)-[:REL]-(c:{label})
-        where c.idx <> $idx and NOT EXISTS {{ (d)-[:REL]-(c) }}
-        with c, sum(1.0/log(md + 2.0)) as aa, count(distinct m) as common
-        optional match (c)-[:REL]-(drug:Drug)
-        return c.name as name, c.type as type, common, round(aa, 3) as adamic_adar,
-               count(distinct drug) as known_drugs
-        order by aa desc limit $k""",
-        idx=ne["idx"], k=k, hub_cap=int(hub_cap), shared_cap=int(shared_cap))
+    try:
+        rows = kg._q(f"""
+            match (d:Entity {{idx:$idx}})-[:REL]-(m:Entity)
+            with d, m, count{{ (m)-[:REL]-() }} as md
+            where md <= $hub_cap
+            with d, m, md order by md asc limit $shared_cap
+            match (m)-[:REL]-(c:{label})
+            where c.idx <> $idx and NOT EXISTS {{ (d)-[:REL]-(c) }}
+            with c, sum(1.0/log(md + 2.0)) as aa, count(distinct m) as common
+            return c.name as name, c.type as type, common, round(aa, 3) as adamic_adar,
+                   count{{ (c)-[:REL]-(:Drug) }} as known_drugs
+            order by aa desc limit $k""",
+            idx=ne["idx"], k=k, hub_cap=int(hub_cap), shared_cap=int(shared_cap))
+    except Exception as e:
+        return {"error": f"prediction query failed: {str(e)[:300]}",
+                "entity": {"name": ne["name"], "type": ne["type"], "degree": ne["degree"]}}
 
     return {
         "entity": {"name": ne["name"], "type": ne["type"], "degree": ne["degree"]},
