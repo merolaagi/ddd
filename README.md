@@ -1,4 +1,4 @@
-# ddd · v0.7.0
+# ddd · v0.8.0
 
 **A headless drug-discovery intelligence company on one Mac.** No staff: six
 departments run as agents executing playbooks on a schedule or on request. The
@@ -81,7 +81,7 @@ open for localhost-only use.
 On-demand tools behind the departments, from the Lab, the API
 (`POST /api/armory/<tool>`) or MCP (`armory_list`, `armory_run`):
 `site_recon`, `har_capture`, `har_summary`, `har_payload`, `rea_inspect`,
-`artifacts`. Captures stay in `data/armory/` (git-ignored). Before REA runs, ddd
+`dock` (see Emulators), `artifacts`. Captures stay in `data/armory/` (git-ignored). Before REA runs, ddd
 writes a temporary copy with server IP addresses normalised (REA's HAR schema
 rejects bracketed IPv6) and, over 30 MB, media bodies dropped; REA failures are
 reported with REA's own reason. Recon refuses
@@ -155,6 +155,38 @@ From the Lab's **Knowledge sources** panel, the API
 `/api/kg/provenance` (MCP `kg_provenance`) reports edge counts by source, so
 PrimeKG, Open Targets and ChEMBL contributions stay distinct. Enrichment is
 best-effort: if an API is unreachable the dossier falls back to PrimeKG alone.
+
+## Emulators
+
+Rung 2 of the pharma.ai ladder: cheap physics-based predictors that *consume*
+the knowledgebase instead of filling it.
+
+**Docking** (`dock` armory tool, `Emulator` category). Give it a target (gene
+symbol or UniProt accession) and one or more ligand SMILES; it fetches the
+target's **AlphaFold** structure on demand (one small PDB, cached under
+`data/armory/structures/`, no bulk downloads), prepares receptor and ligands,
+runs **AutoDock Vina / smina** and returns binding affinities (kcal/mol, more
+negative = tighter) with the poses saved under `data/armory/dock/`. The
+knowledgebase feeds it directly: Open Targets picks the target, ChEMBL supplies
+the measured actives to dock.
+
+Engine and prep tools are **optional** and not in `requirements.txt` (they're
+heavy and you're the one watching disk). The tool detects what's on the host
+and, if something's missing, returns the exact install line instead of failing.
+Install a working stack on the Mac with one of:
+
+```
+brew install smina open-babel
+```
+
+```
+.venv/bin/pip install vina meeko
+```
+
+Caveats, stated on every result: AlphaFold models are **apo** (no
+ligand-shaped pocket) and the default box is a **blind** box over the whole
+protein, so scores are a *relative triage signal*, not validated affinities.
+Pass a pocket centre (`center="x,y,z"`) to dock into a known site.
 
 ## Knowledge graph (optional)
 

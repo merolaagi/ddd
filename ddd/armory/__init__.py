@@ -8,7 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Callable
 
-from . import har, rea, recon
+from . import dock, har, rea, recon
 from .paths import list_artifacts
 
 
@@ -57,6 +57,18 @@ TOOLS: dict[str, Tool] = {t.name: t for t in [
          "Run REA's inspect-web-network-capture on a saved HAR (needs Node 22+/npx).",
          {"har": {"type": "str"}},
          rea.inspect, slow=True),
+    Tool("dock", "Dock ligands", "Emulator",
+         "Dock ligands (SMILES) into a target with AutoDock Vina / smina. Fetches the "
+         "target's AlphaFold structure on demand, preps receptor + ligands and returns "
+         "binding affinities (kcal/mol; more negative = tighter). Blind box over the whole "
+         "protein unless a pocket centre is given. Needs a docking engine installed on the host.",
+         {"target": {"type": "str", "help": "gene symbol (e.g. PDGFRA) or UniProt accession"},
+          "smiles": {"type": "text", "help": "one or more SMILES, newline- or comma-separated"},
+          "exhaustiveness": {"type": "int", "default": 8, "help": "Vina search effort"},
+          "n_poses": {"type": "int", "default": 9},
+          "center": {"type": "str", "default": "", "help": "optional pocket centre 'x,y,z'"},
+          "size": {"type": "float", "default": 0.0, "help": "cubic box side (A) with an explicit centre"}},
+         dock.dock, slow=True),
     Tool("artifacts", "Artifacts", "Library",
          "List captured HARs, REA outputs and recon reports.",
          {}, lambda: list_artifacts()),

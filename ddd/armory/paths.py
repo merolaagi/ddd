@@ -6,7 +6,8 @@ from urllib.parse import urlparse
 from ..config import DATA_DIR
 
 ARMORY = DATA_DIR / "armory"
-DIRS = {"har": ARMORY / "har", "rea": ARMORY / "rea", "reports": ARMORY / "reports"}
+DIRS = {"har": ARMORY / "har", "rea": ARMORY / "rea", "reports": ARMORY / "reports",
+        "dock": ARMORY / "dock"}
 for _d in DIRS.values():
     _d.mkdir(parents=True, exist_ok=True)
 
