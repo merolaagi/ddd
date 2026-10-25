@@ -108,14 +108,20 @@ def hypothesis(a: str, b: str, max_hops: int = 4) -> dict:
     }
 
 
+PROMISCUOUS = {"UBC", "UBB", "UBA52", "RPS27A", "SUMO1", "SUMO2", "SUMO3",
+               "GAPDH", "ACTB", "HSP90AA1", "HSPA8"}  # near-universal binders / tags
+
+
 def predict_links(entity: str, target: str = "gene", k: int = 20,
-                  hub_cap: int = 800, shared_cap: int = 400) -> dict:
+                  hub_cap: int = 800, shared_cap: int = 400, cand_cap: int = 600) -> dict:
     """Rank NOVEL target-type nodes that the graph implies should link to
     `entity` but currently don't — ordered by Adamic-Adar. New hypotheses.
 
     Bounded for high-degree entities: we take `entity`'s neighbours, drop hubs
-    (degree > hub_cap, which are both uninformative and explosive), keep the
-    `shared_cap` most specific, and only then expand to candidate nodes."""
+    (degree > hub_cap, uninformative and explosive), keep the `shared_cap` most
+    specific, expand to candidates, then drop promiscuity hubs — candidates whose
+    own degree > cand_cap, or on the ubiquitin/chaperone denylist — which float to
+    the top for any disease and aren't real targets."""
     label = LABELS.get(target.lower())
     if not label:
         return {"error": f"unknown target type '{target}'. Use one of: {', '.join(sorted(set(LABELS)))}"}
@@ -132,11 +138,15 @@ def predict_links(entity: str, target: str = "gene", k: int = 20,
             with d, m, md order by md asc limit $shared_cap
             match (m)-[:REL]-(c:{label})
             where c.idx <> $idx and NOT EXISTS {{ (d)-[:REL]-(c) }}
+                  and NOT c.name in $deny
             with c, sum(1.0/log(md + 2.0)) as aa, count(distinct m) as common
+            with c, aa, common, count{{ (c)-[:REL]-() }} as cdeg
+            where cdeg <= $cand_cap
             return c.name as name, c.type as type, common, round(aa, 3) as adamic_adar,
-                   count{{ (c)-[:REL]-(:Drug) }} as known_drugs
+                   cdeg as degree, count{{ (c)-[:REL]-(:Drug) }} as known_drugs
             order by aa desc limit $k""",
-            idx=ne["idx"], k=k, hub_cap=int(hub_cap), shared_cap=int(shared_cap))
+            idx=ne["idx"], k=k, hub_cap=int(hub_cap), shared_cap=int(shared_cap),
+            cand_cap=int(cand_cap), deny=sorted(PROMISCUOUS))
     except Exception as e:
         return {"error": f"prediction query failed: {str(e)[:300]}",
                 "entity": {"name": ne["name"], "type": ne["type"], "degree": ne["degree"]}}
@@ -145,8 +155,8 @@ def predict_links(entity: str, target: str = "gene", k: int = 20,
         "entity": {"name": ne["name"], "type": ne["type"], "degree": ne["degree"]},
         "target_type": label,
         "note": "Novel (not already linked) nodes ranked by Adamic-Adar over the shared neighbourhood "
-                f"(hubs over degree {hub_cap} dropped; top {shared_cap} most-specific shared neighbours). "
-                "Topological signal, not validated causality.",
+                f"(shared hubs over degree {hub_cap} dropped; candidates over degree {cand_cap} and "
+                "ubiquitin/chaperone promiscuity nodes excluded). Topological signal, not validated causality.",
         "predictions": rows,
     }
 
