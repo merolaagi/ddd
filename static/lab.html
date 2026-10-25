@@ -277,6 +277,20 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:
     <div id="vcellScales" class="scales"></div>
     <p class="muted" id="vcellNote" style="font-size:12px;margin-top:10px"></p>
   </section>
+  <section class="w12" id="cellsec">
+    <h2>Virtual Cell &middot; live</h2>
+    <p class="muted" style="font-size:13px;margin:-4px 0 12px">A cell built from the graph &mdash; a disease&rsquo;s target proteins, each placed in its <b>real subcellular compartment</b> (PrimeKG cellular-component annotations), with the protein&ndash;protein links among them. Not a simulation: a data-driven map that moves.</p>
+    <div class="row">
+      <input id="cellDis" placeholder="disease, e.g. idiopathic pulmonary fibrosis">
+      <button onclick="loadCell()">Build cell</button>
+      <label class="chk"><input type="checkbox" id="cellMotion" checked> motion</label>
+    </div>
+    <div class="kgwrap" style="margin-top:14px">
+      <canvas id="cellcanvas" style="width:100%;height:540px;display:block"></canvas>
+      <div id="celllegend" class="kglegend"></div>
+      <div id="cellhint" class="kghint">Enter a disease and press <b>Build cell</b>. Proteins sit in their real compartment; size = how many drugs already touch them.</div>
+    </div>
+  </section>
   <section class="w12" id="armory">
     <h2>Tools Armory</h2>
     <p class="muted" style="font-size:13px;margin:-4px 0 12px">On-demand tools ddd pulls up when it needs them. Recon captures a public page as HAR in headless Chromium, maps its data endpoints and schemas, runs REA on the capture and writes a report.</p>
@@ -651,6 +665,134 @@ async function predictLinks(){
       <div class="scroll"><table><tr><th>#</th><th>Candidate</th><th style="text-align:right">Adamic-Adar</th><th style="text-align:right">Common</th><th style="text-align:right">Known drugs</th></tr>${rows||'<tr><td colspan=5 class="muted">No novel candidates found.</td></tr>'}</table></div>`;
   }catch(e2){ $("hypout").innerHTML=`<p class="err">${esc(e2.message)}</p>`; }
 }
+
+</script>
+<script>
+
+/* ---- Virtual Cell: data-driven animated cell ---- */
+const CELL_COMP = {
+  nucleus:       {label:"Nucleus",        color:"#8b5cf6", rad:[0.05,0.26]},
+  er:            {label:"ER",             color:"#ec4899", rad:[0.30,0.38], ang:[-0.6,0.3]},
+  golgi:         {label:"Golgi",          color:"#d97706", rad:[0.30,0.38], ang:[2.2,3.0]},
+  cytoplasm:     {label:"Cytoplasm",      color:"#14b8a6", rad:[0.44,0.80]},
+  mitochondrion: {label:"Mitochondria",   color:"#f59e0b", rad:[0.52,0.68], clusters:[1.0,4.2]},
+  membrane:      {label:"Membrane",       color:"#2b4acb", rad:[0.86,0.90]},
+  extracellular: {label:"Extracellular",  color:"#64748b", rad:[1.04,1.12]},
+};
+let cellData=null, cellNodes=[], cellRAF=null, cellT=0;
+function cvar(n){ return getComputedStyle(document.body).getPropertyValue(n).trim(); }
+function rnd(a,b){ return a+Math.random()*(b-a); }
+
+async function loadCell(){
+  const d=$("cellDis").value.trim(); if(!d) return;
+  $("cellhint").textContent="Building cell…"; $("cellhint").style.display="block";
+  try{
+    const r=await api("/api/vcell/cell?disease="+encodeURIComponent(d)+"&limit=24");
+    if(!r.found){ $("cellhint").textContent=`No disease named "${d}" in the graph.`; return; }
+    cellData=r; layoutCell();
+    const legend=Object.entries(r.compartments).sort((a,b)=>b[1]-a[1])
+      .map(([k,v])=>`<span><i style="background:${CELL_COMP[k]?CELL_COMP[k].color:'#888'}"></i>${esc(CELL_COMP[k]?CELL_COMP[k].label:k)} ${v}</span>`).join("");
+    $("celllegend").innerHTML=legend;
+    $("cellhint").textContent=`${r.proteins.length} target proteins · ${r.links.length} interactions · ${esc(r.disease)}. Hover a protein for details.`;
+    startCell();
+  }catch(e){ $("cellhint").textContent=e.message; }
+}
+
+function layoutCell(){
+  const prots=cellData.proteins;
+  const byComp={};
+  prots.forEach(p=>{ (byComp[p.compartment]=byComp[p.compartment]||[]).push(p); });
+  cellNodes=[];
+  Object.entries(byComp).forEach(([comp,arr])=>{
+    const C=CELL_COMP[comp]||CELL_COMP.cytoplasm;
+    arr.forEach((p,i)=>{
+      let ang;
+      if(comp==="membrane"||comp==="extracellular") ang=(i/arr.length)*Math.PI*2;
+      else if(C.clusters) ang=C.clusters[i%C.clusters.length]+rnd(-0.35,0.35);
+      else if(C.ang) ang=rnd(C.ang[0],C.ang[1]);
+      else ang=rnd(0,Math.PI*2);
+      const rad=rnd(C.rad[0],C.rad[1]);
+      cellNodes.push({gene:p.gene, comp, color:C.color, drugs:p.drugs, cc:p.cc,
+        ang, rad, phase:rnd(0,6.28), spd:rnd(0.4,1.0), r:4+Math.min(p.drugs,12)*0.45});
+    });
+  });
+  const idx={}; cellNodes.forEach(n=>idx[n.gene]=n);
+  cellData._links=(cellData.links||[]).map(([a,b])=>[idx[a],idx[b]]).filter(l=>l[0]&&l[1]);
+}
+
+function cellPos(n,cx,cy,S,t,motion){
+  const w=motion?Math.sin(t*n.spd+n.phase):0;
+  const ar=n.ang+w*0.03, rr=n.rad+(motion?Math.cos(t*n.spd*0.8+n.phase)*0.012:0);
+  return [cx+Math.cos(ar)*rr*S, cy+Math.sin(ar)*rr*S];
+}
+
+function drawCell(){
+  const cv=$("cellcanvas"), ctx=cv.getContext("2d");
+  const dpr=window.devicePixelRatio||1, W=cv.clientWidth, H=cv.clientHeight;
+  if(cv.width!==W*dpr||cv.height!==H*dpr){ cv.width=W*dpr; cv.height=H*dpr; }
+  ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H);
+  const cx=W/2, cy=H/2, S=Math.min(W,H)*0.46;
+  const ink=cvar("--ink"), line=cvar("--line"), muted=cvar("--muted"), panel=cvar("--panel");
+  const motion=$("cellMotion").checked; const t=cellT;
+
+  // cytoplasm + membrane
+  ctx.beginPath(); ctx.arc(cx,cy,S*0.92,0,7); ctx.fillStyle=cvar("--bg"); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx,cy,S*0.92,0,7); ctx.strokeStyle=CELL_COMP.membrane.color; ctx.lineWidth=3; ctx.globalAlpha=.8; ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx,cy,S*0.885,0,7); ctx.lineWidth=1.5; ctx.globalAlpha=.4; ctx.stroke(); ctx.globalAlpha=1;
+  // mitochondria (two beans)
+  CELL_COMP.mitochondrion.clusters.forEach(a=>{
+    const mx=cx+Math.cos(a)*S*0.6, my=cy+Math.sin(a)*S*0.6;
+    ctx.save(); ctx.translate(mx,my); ctx.rotate(a+1.57);
+    ctx.beginPath(); ctx.ellipse(0,0,S*0.14,S*0.06,0,0,7); ctx.fillStyle="rgba(245,158,11,.14)"; ctx.fill();
+    ctx.strokeStyle="rgba(245,158,11,.5)"; ctx.lineWidth=1.3; ctx.stroke(); ctx.restore();
+  });
+  // ER arcs near nucleus
+  ctx.strokeStyle="rgba(236,72,153,.4)"; ctx.lineWidth=1.3;
+  for(let k=0;k<3;k++){ ctx.beginPath(); ctx.arc(cx+S*0.33*Math.cos(-0.15),cy+S*0.33*Math.sin(-0.15),S*(0.07+k*0.03),0.6,2.4); ctx.stroke(); }
+  // nucleus
+  ctx.beginPath(); ctx.arc(cx,cy,S*0.3,0,7); ctx.fillStyle="rgba(139,92,246,.13)"; ctx.fill();
+  ctx.strokeStyle="rgba(139,92,246,.55)"; ctx.lineWidth=1.5; ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx-S*0.08,cy+S*0.05,S*0.05,0,7); ctx.fillStyle="rgba(139,92,246,.3)"; ctx.fill();
+
+  // links
+  ctx.lineWidth=1; ctx.globalAlpha=.35+(motion?Math.sin(t*1.5)*0.15:0);
+  ctx.strokeStyle=cvar("--accent");
+  (cellData._links||[]).forEach(([a,b])=>{
+    const pa=cellPos(a,cx,cy,S,t,motion), pb=cellPos(b,cx,cy,S,t,motion);
+    ctx.beginPath(); ctx.moveTo(pa[0],pa[1]); ctx.lineTo(pb[0],pb[1]); ctx.stroke();
+  });
+  ctx.globalAlpha=1;
+
+  // proteins
+  ctx.font='600 10px "JetBrains Mono",monospace'; ctx.textAlign="center";
+  cellNodes.forEach(n=>{
+    const [x,y]=cellPos(n,cx,cy,S,t,motion); n._x=x; n._y=y;
+    ctx.beginPath(); ctx.arc(x,y,n.r,0,7); ctx.fillStyle=n.color; ctx.fill();
+    ctx.lineWidth=1.5; ctx.strokeStyle=panel; ctx.stroke();
+    ctx.fillStyle=ink; ctx.fillText(n.gene, x, y-n.r-3);
+  });
+}
+
+function startCell(){
+  if(cellRAF) cancelAnimationFrame(cellRAF);
+  const step=()=>{ cellT+=0.016; drawCell();
+    if($("cellMotion").checked && !matchMedia("(prefers-reduced-motion: reduce)").matches) cellRAF=requestAnimationFrame(step);
+  };
+  if($("cellMotion").checked && !matchMedia("(prefers-reduced-motion: reduce)").matches) cellRAF=requestAnimationFrame(step);
+  else drawCell();
+}
+(function(){
+  const cv=document.getElementById("cellcanvas"); if(!cv) return;
+  cv.addEventListener("mousemove",e=>{
+    const rect=cv.getBoundingClientRect(), mx=e.clientX-rect.left, my=e.clientY-rect.top;
+    let hit=null; for(const n of cellNodes){ if(Math.hypot(n._x-mx,n._y-my)<=n.r+3){ hit=n; break; } }
+    $("cellhint").innerHTML = hit
+      ? `<b>${esc(hit.gene)}</b> · ${esc((CELL_COMP[hit.comp]||{}).label||hit.comp)} · ${hit.drugs} drugs${hit.cc&&hit.cc.length?` · <span class="muted">${esc(hit.cc.slice(0,2).join("; "))}</span>`:""}`
+      : (cellData?`${cellData.proteins.length} proteins · ${cellData.links.length} interactions · ${esc(cellData.disease)}`:"Enter a disease and press Build cell.");
+  });
+  const mo=document.getElementById("cellMotion"); if(mo) mo.addEventListener("change",startCell);
+  window.addEventListener("resize",()=>{ if(cellData) drawCell(); });
+})();
 
 </script>
 <script>function toggleTheme(){var h=document.documentElement;var n=h.getAttribute("data-theme")==="dark"?"light":"dark";h.setAttribute("data-theme",n);try{localStorage.setItem("ddd-theme",n);}catch(e){}paintThemeBtn();}function paintThemeBtn(){var b=document.getElementById("themeBtn");if(b)b.textContent=document.documentElement.getAttribute("data-theme")==="dark"?"\u2600 Light":"\u263e Dark";}paintThemeBtn();</script>

@@ -118,6 +118,57 @@ def disease_drugs(disease: str, limit: int = 15):
         return x.name as drug, r.display as relation limit $limit""", disease=disease, limit=limit)
 
 
+_COMPARTMENTS = [  # priority order; first keyword match wins
+    ("nucleus",       ("nucle", "chromat")),
+    ("membrane",      ("plasma membrane", "cell surface", "external side", "cell membrane")),
+    ("mitochondrion", ("mitochond",)),
+    ("er",            ("endoplasmic reticulum", "sarcoplasmic reticulum")),
+    ("golgi",         ("golgi",)),
+    ("extracellular", ("extracellular", "secreted", "basement membrane")),
+    ("cytoplasm",     ("cytosol", "cytoplasm", "ribosom", "proteasome")),
+]
+
+
+def _compartment(cc_names):
+    for comp, keys in _COMPARTMENTS:
+        for cc in cc_names:
+            lc = (cc or "").lower()
+            if any(k in lc for k in keys):
+                return comp
+    return "cytoplasm"
+
+
+def cell_view(disease: str, limit: int = 22):
+    """A cell populated by a disease's target proteins, each placed in its real
+    subcellular compartment from PrimeKG cellular-component annotations, plus the
+    protein-protein links among them. Drives the Virtual Cell animation."""
+    d = find_disease(disease)
+    if not d:
+        return {"found": False, "disease": disease}
+    rows = _q("""
+        match (dis:Disease {name:$d})-[:REL]-(g:Gene)
+        with distinct g limit $limit
+        optional match (g)-[:REL]-(cc:CellComponent)
+        with g, collect(distinct cc.name) as ccs
+        return g.name as gene, ccs as compartments,
+               count{ (g)-[:REL]-(:Drug) } as drugs""", d=d, limit=int(limit))
+    proteins = [{"gene": r["gene"], "compartment": _compartment(r["compartments"]),
+                 "cc": r["compartments"][:4], "drugs": r["drugs"]} for r in rows]
+    names = [p["gene"] for p in proteins]
+    links = []
+    if len(names) > 1:
+        lr = _q("""
+            match (a:Gene)-[:REL]-(b:Gene)
+            where a.name in $names and b.name in $names and a.name < b.name
+            return distinct a.name as a, b.name as b limit 80""", names=names)
+        links = [[r["a"], r["b"]] for r in lr]
+    comp_counts = {}
+    for p in proteins:
+        comp_counts[p["compartment"]] = comp_counts.get(p["compartment"], 0) + 1
+    return {"found": True, "disease": d, "proteins": proteins, "links": links,
+            "compartments": comp_counts}
+
+
 def subgraph(center: str, depth: int = 1, limit: int = 60, relation: str | None = None):
     """Nodes + edges around a center entity, shaped for graph rendering.
     depth 1 = direct neighbors; depth 2 also expands one hop from those."""

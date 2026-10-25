@@ -215,6 +215,11 @@ def kg_predict(entity: str, target: str = "gene", k: int = 20):
     return _kg(kg_model.predict_links, entity, target, k)
 
 
+@app.get("/api/vcell/cell")
+def vcell_cell(disease: str, limit: int = 22):
+    return _kg(kg.cell_view, disease, limit)
+
+
 @app.get("/api/sources/opentargets/disease")
 def ot_disease(disease: str, size: int = 25, write: bool = True):
     from .sources import opentargets
