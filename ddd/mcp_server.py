@@ -12,7 +12,7 @@ import time
 
 from mcp.server.mcpserver import MCPServer
 
-from . import __version__, kg, store
+from . import __version__, kg, kg_model, store
 from .armory import TOOLS, run_tool
 from .company import charter as charter_mod
 from .company import db as cdb
@@ -130,6 +130,23 @@ def kg_subgraph(center: str, depth: int = 1, limit: int = 60, relation: str | No
 def kg_provenance() -> list[dict]:
     """Edge counts by source (PrimeKG vs enrichment from Open Targets, ChEMBL)."""
     return kg.provenance()
+
+
+@mcp.tool()
+def kg_hypothesis(a: str, b: str, max_hops: int = 4) -> dict:
+    """Check a hypothesis: how plausible is a DIRECT link between two entities?
+    Returns whether they're already linked, the shortest existing path, the
+    shared-neighbour evidence and the standard link-prediction scores
+    (common neighbours, Jaccard, Adamic-Adar). A model computed from the graph."""
+    return kg_model.hypothesis(a, b, max_hops)
+
+
+@mcp.tool()
+def kg_predict_links(entity: str, target: str = "gene", k: int = 20) -> dict:
+    """Generate hypotheses: rank NOVEL target-type nodes (gene/drug/disease/...)
+    that the graph implies should link to `entity` but currently don't, by
+    Adamic-Adar over the shared neighbourhood. New, testable predictions."""
+    return kg_model.predict_links(entity, target, k)
 
 
 @mcp.tool()

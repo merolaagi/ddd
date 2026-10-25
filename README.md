@@ -1,4 +1,4 @@
-# ddd · v0.8.0
+# ddd · v0.9.0
 
 **A headless drug-discovery intelligence company on one Mac.** No staff: six
 departments run as agents executing playbooks on a schedule or on request. The
@@ -123,6 +123,25 @@ required); they're stored in `data/benchmark_index.json`.
 A six-scale scaffold (molecular → organism) with biological age as the
 conditioning variable. The molecular scale is live, the intracellular scale
 links to Fate Memory Lab, the rest are stubs with a fixed contract.
+
+## Models from the graph
+
+Rung 3: predictions computed **from the knowledge graph itself**, not fetched
+from anywhere. Standard link-prediction over PrimeKG plus every enrichment edge.
+
+- **Check a hypothesis** (`/api/kg/hypothesis`, MCP `kg_hypothesis`, Lab panel):
+  how plausible is a *direct* link between two entities? Returns whether they're
+  already linked and by what source, the shortest existing path, the shared
+  neighbours, and the standard indices (common neighbours, Jaccard, Adamic-Adar,
+  preferential attachment) with a plain-language reading.
+- **Generate hypotheses** (`/api/kg/predict`, MCP `kg_predict_links`): rank
+  NOVEL nodes of a type (gene/drug/disease/phenotype) that the graph implies
+  should link to an entity but currently don't, by Adamic-Adar over the shared
+  neighbourhood — new, testable predictions, each with its evidence.
+
+Tier 1 above needs no training and no extra deps. Tier 2 is learned node2vec
+embeddings (`kg_model.train_embeddings`, optional `gensim`) for similarity-based
+scoring once you want a trained model. Topological signal, not validated causality.
 
 ## Knowledge graph viewer
 

@@ -325,6 +325,21 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:
     </div>
     <pre id="kgout" class="mono" style="display:none">—</pre>
   </section>
+  <section class="w12" id="hypsec">
+    <h2>Hypothesis &amp; link prediction</h2>
+    <p class="muted" style="font-size:13px;margin:-4px 0 12px">A model computed from the graph itself &mdash; not fetched from anywhere. Check whether a link is plausible with the standard link-prediction indices, or ask the graph for novel connections it implies but does not yet state.</p>
+    <div class="row">
+      <input id="hypA" placeholder="entity A, e.g. TERT">
+      <input id="hypB" placeholder="entity B, e.g. idiopathic pulmonary fibrosis">
+      <button onclick="checkHypothesis()">Check hypothesis</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <input id="predE" placeholder="entity, e.g. idiopathic pulmonary fibrosis" style="flex:2">
+      <select id="predT" style="flex:0;min-width:130px"><option value="gene">novel genes</option><option value="drug">novel drugs</option><option value="disease">novel diseases</option><option value="phenotype">novel phenotypes</option></select>
+      <button class="ghost" onclick="predictLinks()">Predict novel links</button>
+    </div>
+    <div id="hypout" style="margin-top:16px"><p class="muted">Check a pair, or predict novel links for an entity. Needs Neo4j + PrimeKG.</p></div>
+  </section>
   <section class="w12" id="srcsec">
     <h2>Knowledge sources · enrichment</h2>
     <p class="muted" style="font-size:13px;margin:-4px 0 12px">Pull evidence from public APIs into your graph, on demand — no bulk downloads. Open Targets adds evidence-weighted target-disease scores; ChEMBL adds potent measured compounds per target. Writes are tagged by source.</p>
@@ -593,6 +608,50 @@ async function watchProgram(id){
   else setTimeout(() => watchProgram(id), 1500);
 }
 initCompany();
+
+async function checkHypothesis(){
+  const a=$("hypA").value.trim(), b=$("hypB").value.trim();
+  if(!a||!b) return;
+  $("hypout").innerHTML='<p class="muted">Checking…</p>';
+  try{
+    const r=await api(`/api/kg/hypothesis?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`);
+    if(!r.found){ $("hypout").innerHTML=`<p class="err">${esc(r.error||"not found")}</p>`; return; }
+    const s=r.scores;
+    const badge={known:"done",strong:"done",moderate:"done",tentative:"running",weak:"error"}[r.plausibility]||"running";
+    const sh=(r.shared_neighbors||[]).map(n=>`<span class="tag">${esc(n.name)} <span class="muted">${esc(n.type)}·${n.degree}</span></span>`).join(" ");
+    const pathTxt=(r.shortest_path.nodes&&r.shortest_path.nodes.length)?r.shortest_path.nodes.map(esc).join("  →  "):"no path within limit";
+    $("hypout").innerHTML=`
+      <div class="row" style="gap:10px;align-items:center">
+        <b>${esc(r.a.name)}</b><span class="muted">↔</span><b>${esc(r.b.name)}</b>
+        <span class="status s-${badge}">${esc(r.plausibility)}</span>
+        ${r.direct_link?`<span class="tag">direct: ${esc(r.direct_relations.join(", "))} <span class="muted">(${esc(r.direct_sources.join(", "))})</span></span>`:""}
+      </div>
+      <p class="muted" style="margin:10px 0 12px">${esc(r.reading)}</p>
+      <div class="row" style="gap:22px;margin:0 0 12px">
+        <span><b style="font-size:18px">${s.common_neighbors}</b> <span class="muted" style="font-size:12px">common</span></span>
+        <span><b style="font-size:18px">${s.adamic_adar}</b> <span class="muted" style="font-size:12px">Adamic-Adar</span></span>
+        <span><b style="font-size:18px">${s.jaccard}</b> <span class="muted" style="font-size:12px">Jaccard</span></span>
+        <span><b style="font-size:18px">${r.path_hops||"—"}</b> <span class="muted" style="font-size:12px">hops</span></span>
+      </div>
+      <div><span class="muted" style="font-size:12px">Shortest existing path</span><br><span class="mono" style="font-size:12px">${pathTxt}</span></div>
+      ${sh?`<div style="margin-top:12px"><span class="muted" style="font-size:12px">Shared neighbours (most specific first)</span><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:7px">${sh}</div></div>`:""}`;
+  }catch(e){ $("hypout").innerHTML=`<p class="err">${esc(e.message)}</p>`; }
+}
+async function predictLinks(){
+  const e=$("predE").value.trim(), t=$("predT").value;
+  if(!e) return;
+  $("hypout").innerHTML='<p class="muted">Scoring novel links across the graph…</p>';
+  try{
+    const r=await api(`/api/kg/predict?entity=${encodeURIComponent(e)}&target=${t}&k=20`);
+    if(r.error){ $("hypout").innerHTML=`<p class="err">${esc(r.error)}</p>`; return; }
+    const rows=(r.predictions||[]).map((p,i)=>`<tr><td>${i+1}</td><td><b>${esc(p.name)}</b></td><td class="num">${p.adamic_adar}</td><td class="num">${p.common}</td><td class="num">${p.known_drugs||0}</td></tr>`).join("");
+    $("hypout").innerHTML=`
+      <p style="margin:0 0 4px"><b>Novel ${esc(r.target_type)} links for ${esc(r.entity.name)}</b></p>
+      <p class="muted" style="font-size:12px;margin:0 0 12px">${esc(r.note)}</p>
+      <div class="scroll"><table><tr><th>#</th><th>Candidate</th><th style="text-align:right">Adamic-Adar</th><th style="text-align:right">Common</th><th style="text-align:right">Known drugs</th></tr>${rows||'<tr><td colspan=5 class="muted">No novel candidates found.</td></tr>'}</table></div>`;
+  }catch(e2){ $("hypout").innerHTML=`<p class="err">${esc(e2.message)}</p>`; }
+}
+
 </script>
 <script>function toggleTheme(){var h=document.documentElement;var n=h.getAttribute("data-theme")==="dark"?"light":"dark";h.setAttribute("data-theme",n);try{localStorage.setItem("ddd-theme",n);}catch(e){}paintThemeBtn();}function paintThemeBtn(){var b=document.getElementById("themeBtn");if(b)b.textContent=document.documentElement.getAttribute("data-theme")==="dark"?"\u2600 Light":"\u263e Dark";}paintThemeBtn();</script>
 </body>

@@ -203,6 +203,18 @@ def kg_provenance():
     return _kg(kg.provenance)
 
 
+@app.get("/api/kg/hypothesis")
+def kg_hypothesis(a: str, b: str, max_hops: int = 4):
+    from . import kg_model
+    return _kg(kg_model.hypothesis, a, b, max_hops)
+
+
+@app.get("/api/kg/predict")
+def kg_predict(entity: str, target: str = "gene", k: int = 20):
+    from . import kg_model
+    return _kg(kg_model.predict_links, entity, target, k)
+
+
 @app.get("/api/sources/opentargets/disease")
 def ot_disease(disease: str, size: int = 25, write: bool = True):
     from .sources import opentargets
