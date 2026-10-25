@@ -40,7 +40,7 @@ async def _basic_auth(request, call_next):
     Lets the whole web UI be exposed over the tunnel safely. Any username is
     accepted; the password must match. With no password set, the app stays
     open (localhost-only use) exactly as before."""
-    if _WEB_PASSWORD:
+    if _WEB_PASSWORD and request.url.path != "/healthz":
         header = request.headers.get("authorization", "")
         ok = False
         if header.startswith("Basic "):
@@ -77,6 +77,13 @@ def hq():
 @app.get("/lab")
 def lab():
     return FileResponse(STATIC / "lab.html")
+
+
+@app.get("/healthz")
+def healthz():
+    """Unauthenticated readiness probe (serve.sh), so Basic auth on the UI
+    doesn't make startup look like a failure."""
+    return {"ok": True, "version": __version__}
 
 
 @app.get("/api/info")

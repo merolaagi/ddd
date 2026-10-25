@@ -16,7 +16,7 @@ nohup python -m uvicorn ddd.app:app --host 127.0.0.1 --port "$WEB" > logs/web.lo
 echo "Starting ddd (first start can take ~20s while Python compiles RDKit and scikit-learn) ..."
 ok=0
 for i in $(seq 1 45); do
-  if curl -fs "http://127.0.0.1:$WEB/api/info" > /dev/null; then ok=1; break; fi
+  if curl -fs "http://127.0.0.1:$WEB/healthz" > /dev/null; then ok=1; break; fi
   if ! pgrep -f "uvicorn ddd.app:app" > /dev/null; then break; fi
   sleep 1
 done
