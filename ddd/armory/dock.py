@@ -42,7 +42,8 @@ DOCK = DIRS["har"].parent / "dock"
 DOCK.mkdir(parents=True, exist_ok=True)
 
 UNIPROT = "https://rest.uniprot.org/uniprotkb/search"
-ALPHAFOLD = "https://alphafold.ebi.ac.uk/files/AF-{acc}-F1-model_v4.pdb"
+AF_API = "https://alphafold.ebi.ac.uk/api/prediction/{acc}"
+AF_FILE = "https://alphafold.ebi.ac.uk/files/AF-{acc}-F1-model_v{v}.pdb"
 
 
 class ToolMissing(Exception):
@@ -80,16 +81,33 @@ def resolve_uniprot(symbol: str) -> dict:
 
 
 def fetch_alphafold(acc: str) -> Path:
-    """Cache the AlphaFold predicted structure for a UniProt accession."""
-    dest = STRUCT / f"AF-{acc}-F1-v4.pdb"
+    """Cache the AlphaFold predicted structure for a UniProt accession. Resolves
+    the current file URL via the AlphaFold API (version-proof), with versioned
+    filename fallbacks."""
+    dest = STRUCT / f"AF-{acc}.pdb"
     if dest.exists() and dest.stat().st_size > 0:
         return dest
-    r = httpx.get(ALPHAFOLD.format(acc=acc), timeout=60, follow_redirects=True)
-    if r.status_code == 404:
-        raise ValueError(f"no AlphaFold model for {acc} (not in the predicted set)")
-    r.raise_for_status()
-    dest.write_bytes(r.content)
-    return dest
+    urls = []
+    try:
+        r = httpx.get(AF_API.format(acc=acc), timeout=30, follow_redirects=True)
+        if r.status_code == 200 and r.json():
+            u = r.json()[0].get("pdbUrl")
+            if u:
+                urls.append(u)
+    except Exception:
+        pass
+    urls += [AF_FILE.format(acc=acc, v=v) for v in (6, 5, 4)]
+    last = None
+    for u in urls:
+        try:
+            rr = httpx.get(u, timeout=60, follow_redirects=True)
+            if rr.status_code == 200 and rr.content:
+                dest.write_bytes(rr.content)
+                return dest
+            last = f"HTTP {rr.status_code}"
+        except Exception as e:
+            last = str(e)[:120]
+    raise ValueError(f"no AlphaFold model fetched for {acc} (last: {last})")
 
 
 # ------------------------------------------------------------------ box
@@ -260,7 +278,7 @@ def dock(target: str, smiles: str, exhaustiveness: int = 8, n_poses: int = 9,
         ligs = [s.strip() for s in smiles.replace(",", "\n").splitlines() if s.strip()]
         if not ligs:
             return {"ok": False, "error": "no SMILES given"}
-        rec_pdbqt = STRUCT / f"AF-{info['accession']}-F1-v4.pdbqt"
+        rec_pdbqt = STRUCT / f"AF-{info['accession']}.pdbqt"
         if not rec_pdbqt.exists():
             _prep_receptor(pdb, rec_pdbqt)
     except ToolMissing as e:
