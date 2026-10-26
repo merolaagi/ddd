@@ -578,6 +578,170 @@ def antiviral_repurposing(ctx, virus: str, top: int = 8, max_compounds: int = 20
             "top_compound": ranked[0].get("chembl_id") if ranked else None}, lines
 
 
+# ---------------------------------------------------------------- Repurposing (general)
+
+def _compounds_for_targets(ctx, targets, max_compounds):
+    """Shared compound layer: ChEMBL inhibitors of each target -> one row per
+    compound (best score, targets hit) -> RDKit + baseline triage. `targets` is
+    a list of dicts with 'gene' and 'weight'; each gets 'actives' filled in."""
+    from ..sources import chembl
+    from ..chem import describe
+    from ..runner import predict
+    compounds = []
+    for t in targets:
+        actives, n = [], 0
+        ctx.log(f"ChEMBL inhibitors of {t['gene']}")
+        try:
+            res = chembl.target_actives(t["gene"], limit=50)
+            actives = res.get("actives", []) or []
+            n = res.get("count", len(actives))
+        except Exception as e:
+            ctx.log(f"  unavailable: {str(e)[:80]}")
+        t["actives"] = n
+        for a in actives:
+            try:
+                pc = float(a.get("pchembl") or 0)
+            except (TypeError, ValueError):
+                pc = 0.0
+            if a.get("smiles"):
+                compounds.append({"smiles": a["smiles"], "chembl_id": a.get("molecule_chembl_id"),
+                                  "pchembl": pc, "target": t["gene"], "score": round(pc * float(t["weight"]), 3)})
+    agg = {}
+    for c in compounds:
+        k = c["chembl_id"] or c["smiles"]
+        a = agg.get(k)
+        if not a:
+            agg[k] = dict(c, targets_hit={c["target"]})
+        else:
+            a["targets_hit"].add(c["target"])
+            if c["score"] > a["score"]:
+                a.update({"score": c["score"], "pchembl": c["pchembl"], "target": c["target"]})
+    ranked = sorted(agg.values(), key=lambda c: (len(c["targets_hit"]), c["score"]), reverse=True)[:max_compounds]
+    smis = [c["smiles"] for c in ranked]
+    desc = {s: describe(s) for s in smis}
+    tox, sol = {}, {}
+    if smis:
+        try:
+            for s, p in zip(smis, predict("clintox", smis, "rf")):
+                if p.get("valid"):
+                    tox[s] = p["prediction"]
+        except Exception as e:
+            ctx.log(f"  clintox baseline unavailable: {str(e)[:80]}")
+        try:
+            for s, p in zip(smis, predict("esol", smis, "rf")):
+                if p.get("valid"):
+                    sol[s] = p["prediction"]
+        except Exception:
+            pass
+    return ranked, desc, tox, sol, agg
+
+
+def _compound_flags(d, tp, sv):
+    flags = []
+    if d.get("valid"):
+        if d.get("lipinski_violations", 0) > 1:
+            flags.append("Ro5")
+        if d.get("qed", 1) < 0.3:
+            flags.append("low QED")
+    if tp is not None and tp > 0.5:
+        flags.append("tox risk")
+    if sv is not None and sv < -6:
+        flags.append("poor solubility")
+    return flags
+
+
+def disease_repurposing(ctx, disease: str, top: int = 10, max_compounds: int = 20, novel: bool = True):
+    """General repurposing for a human disease (autoimmune, cancer, metabolic,
+    neuro, ...). Targets come from the knowledge graph + Open Targets (and, with
+    novel=True, a few link-prediction targets the graph implies). Then the shared
+    compound layer ranks ChEMBL modulators by potency x association. Not validated."""
+    st = kg.status()
+    if not st.get("connected"):
+        raise RuntimeError("Knowledge graph is offline. Start Neo4j and load PrimeKG (see README), then rerun. "
+                           f"Detail: {st.get('error', 'no connection')[:160]}")
+    if not st.get("nodes"):
+        raise RuntimeError("Neo4j is connected but empty. Load PrimeKG: "
+                           ".venv/bin/python scripts/load_primekg.py --download")
+    name = kg.find_disease(disease)
+    if not name:
+        raise RuntimeError(f"No disease in PrimeKG matches '{disease}'. Try a broader name.")
+    ctx.log(f"Disease node: {name}")
+
+    ot_scores, ot_note = {}, ""
+    from ..sources import opentargets
+    ctx.log("Fetching Open Targets association scores")
+    try:
+        r = opentargets.enrich_disease(disease, size=max(top, 25))
+        if r.get("efo_id"):
+            ot_scores = {t["symbol"]: t["score"] for t in r.get("targets", [])}
+            ot_note = f"Open Targets {r['efo_id']} · {len(ot_scores)} scored targets"
+        else:
+            ot_note = "Open Targets had no match for this disease"
+    except Exception as e:
+        ot_note = f"Open Targets unavailable ({str(e)[:80]})"
+        ctx.log("  " + ot_note)
+
+    genes = {}
+    for t in kg.disease_candidate_targets(name, top):
+        genes[t["gene"]] = {"gene": t["gene"], "ot_score": ot_scores.get(t["gene"]), "novel": False}
+    for sym, sc in ot_scores.items():
+        genes.setdefault(sym, {"gene": sym, "novel": False})["ot_score"] = sc
+        genes[sym]["novel"] = genes[sym].get("novel", False)
+
+    novel_added = 0
+    if novel:
+        try:
+            from .. import kg_model
+            pr = kg_model.predict_links(name, "gene", 12)
+            for p in (pr.get("predictions") or [])[:6]:
+                if p["name"] not in genes:
+                    genes[p["name"]] = {"gene": p["name"], "ot_score": None, "novel": True, "aa": p.get("adamic_adar")}
+                    novel_added += 1
+        except Exception as e:
+            ctx.log(f"  novel-target prediction skipped: {str(e)[:80]}")
+
+    ranked_t = sorted(genes.values(),
+                      key=lambda g: (g.get("ot_score") if g.get("ot_score") is not None else -1), reverse=True)[:top]
+    targets = [{"gene": g["gene"], "weight": (g.get("ot_score") or 0.5),
+                "ot_score": g.get("ot_score"), "novel": g.get("novel", False)} for g in ranked_t]
+
+    ranked, desc, tox, sol, agg = _compounds_for_targets(ctx, targets, max_compounds)
+
+    lines = [f"# Repurposing dossier: {name}", "",
+             f"Query: '{disease}' · targets from PrimeKG + Open Targets"
+             + (" + link prediction" if novel_added else "") + " · compounds from ChEMBL.", ""]
+    if ot_note:
+        lines += [f"_{ot_note}._", ""]
+    lines += ["## Targets", "",
+              "Ranked by Open Targets association (0–1). Rows marked **novel** came from link prediction — "
+              "the graph implies them but hasn't been told. Weight (used to score compounds) is the OT score, "
+              "or 0.5 for novel targets.", "",
+              "| # | Target | OT score | Novel | ChEMBL modulators |", "|---|---|---|---|---|"]
+    for i, t in enumerate(targets, 1):
+        ot = f"{t['ot_score']:.3f}" if t["ot_score"] is not None else "—"
+        lines.append(f"| {i} | {t['gene']} | {ot} | {'yes' if t['novel'] else ''} | {t.get('actives', 0)} |")
+
+    lines += ["", "## Candidate compounds (repurposing)", "",
+              "Measured modulators (pChEMBL ≥ 6) of the targets, scored by **potency × association**, bonus for "
+              "hitting several targets. Properties from RDKit; tox/solubility are baseline predictions — research "
+              "signals, not assays.", "",
+              "| # | ChEMBL ID | Best target | pChEMBL | Hits | Score | MW | QED | ClinTox p | Flags |",
+              "|---|---|---|---|---|---|---|---|---|---|"]
+    for i, c in enumerate(ranked, 1):
+        d = desc.get(c["smiles"], {})
+        tp = tox.get(c["smiles"])
+        flags = _compound_flags(d, tp, sol.get(c["smiles"]))
+        lines.append(f"| {i} | {c.get('chembl_id') or '—'} | {c['target']} | {c['pchembl']:.2f} | "
+                     f"{len(c['targets_hit'])} | {c['score']:.2f} | {d.get('mol_weight', '—')} | "
+                     f"{d.get('qed', '—')} | {'—' if tp is None else f'{tp:.2f}'} | {', '.join(flags) or '—'} |")
+    lines += ["", "_Association and activity are not efficacy. Candidates need disease-relevant assays and "
+              "safety/PK before they mean anything clinically. Not clinical advice._"]
+
+    return {"disease": name, "targets": len(targets), "novel_targets": novel_added,
+            "candidates": len(ranked), "top_target": targets[0]["gene"] if targets else None,
+            "top_compound": ranked[0].get("chembl_id") if ranked else None}, lines
+
+
 # ---------------------------------------------------------------- Discovery programs
 
 def discovery_program(ctx, disease: str, molecules: str | list = "", top_targets: int = 15):

@@ -1,4 +1,4 @@
-# ddd · v0.10.0
+# ddd · v0.11.0
 
 **A headless drug-discovery intelligence company on one Mac.** No staff: six
 departments run as agents executing playbooks on a schedule or on request. The
@@ -159,6 +159,14 @@ Known viruses: SARS-CoV-2, influenza, RSV, rhinovirus, parainfluenza. The
 curated virus→host edges are written into the graph (`source=VirusHost`,
 `ddd/sources/virhost.py`); a live VirHostNet/IntAct connector can extend them
 later. Computational triage only — efficacy needs antiviral assays and lung PK.
+
+`disease_repurposing {disease}` generalises this to any **human** disease
+(autoimmune, cancer, metabolic, neuro…). Here the targets come straight from the
+graph + Open Targets (plus a few novel link-prediction targets), since they're
+human proteins already in PrimeKG — then the same compound layer ranks ChEMBL
+modulators by potency × association. Antivirals use the curated host-factor seed
+because the targets are host proteins; bacterial infections would need a
+bacterial-target seed (not human), a scoped next step.
 
 ## Knowledge graph viewer
 

@@ -96,6 +96,15 @@ PLAYBOOKS = {p.name: p for p in [
               "top": {"type": "int", "default": 8},
               "max_compounds": {"type": "int", "default": 20}},
              pb.antiviral_repurposing),
+    Playbook("disease_repurposing", "Disease repurposing", "programs",
+             "Any human disease (autoimmune, cancer, metabolic, neuro…): targets from the graph + Open "
+             "Targets (plus novel link-prediction targets) → ChEMBL modulators ranked as repurposing "
+             "candidates. Needs Neo4j + PrimeKG. Not validated.",
+             {"disease": {"type": "str", "default": "rheumatoid arthritis"},
+              "top": {"type": "int", "default": 10},
+              "max_compounds": {"type": "int", "default": 20},
+              "novel": {"type": "bool", "default": True}},
+             pb.disease_repurposing),
     Playbook("discovery_program", "Discovery program", "programs",
              "Disease → PrimeKG targets → molecule triage and ADMET/activity screen → program report. "
              "Runs the molecule screen even when the graph is offline.",
