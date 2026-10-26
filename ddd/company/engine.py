@@ -96,6 +96,12 @@ PLAYBOOKS = {p.name: p for p in [
               "top": {"type": "int", "default": 8},
               "max_compounds": {"type": "int", "default": 20}},
              pb.antiviral_repurposing),
+    Playbook("antibacterial_repurposing", "Antibacterial repurposing", "programs",
+             "For a priority bacterium: validated bacterial targets (cell wall, DNA gyrase, folate, FAS) → "
+             "their ChEMBL inhibitors as repurposing candidates, triaged and ranked. Not validated.",
+             {"bacterium": {"type": "str", "default": "m. tuberculosis"},
+              "max_compounds": {"type": "int", "default": 20}},
+             pb.antibacterial_repurposing),
     Playbook("disease_repurposing", "Disease repurposing", "programs",
              "Any human disease (autoimmune, cancer, metabolic, neuro…): targets from the graph + Open "
              "Targets (plus novel link-prediction targets) → ChEMBL modulators ranked as repurposing "

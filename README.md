@@ -1,4 +1,4 @@
-# ddd · v0.11.0
+# ddd · v0.12.0
 
 **A headless drug-discovery intelligence company on one Mac.** No staff: six
 departments run as agents executing playbooks on a schedule or on request. The
@@ -165,8 +165,14 @@ later. Computational triage only — efficacy needs antiviral assays and lung PK
 graph + Open Targets (plus a few novel link-prediction targets), since they're
 human proteins already in PrimeKG — then the same compound layer ranks ChEMBL
 modulators by potency × association. Antivirals use the curated host-factor seed
-because the targets are host proteins; bacterial infections would need a
-bacterial-target seed (not human), a scoped next step.
+because the targets are host proteins.
+
+`antibacterial_repurposing {bacterium}` closes the infection track: validated
+bacterial targets (cell wall, DNA gyrase, folate, fatty-acid synthesis) from a
+curated seed (`ddd/sources/bughost.py`, resolved in ChEMBL by protein name) →
+their inhibitors, triaged and ranked. Pathogens: M. tuberculosis, S. aureus,
+P. aeruginosa, E. coli. The dossier flags targets that returned no ChEMBL hits
+so the query names can be tuned.
 
 ## Knowledge graph viewer
 

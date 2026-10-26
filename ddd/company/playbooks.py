@@ -578,6 +578,50 @@ def antiviral_repurposing(ctx, virus: str, top: int = 8, max_compounds: int = 20
             "top_compound": ranked[0].get("chembl_id") if ranked else None}, lines
 
 
+# ---------------------------------------------------------------- Antibacterial
+
+def antibacterial_repurposing(ctx, bacterium: str, max_compounds: int = 20):
+    """Antibacterial repurposing for a priority pathogen. Validated bacterial
+    targets (cell wall, DNA gyrase, folate, fatty-acid synthesis) -> their ChEMBL
+    inhibitors, triaged and ranked. Targets are bacterial proteins (resolved in
+    ChEMBL by protein name), not in PrimeKG. Not validated; resistance-aware."""
+    from ..sources import bughost
+    seed = bughost.link_bacterium_targets(bacterium)
+    if not seed.get("found"):
+        raise ValueError(f"Unknown bacterium '{bacterium}'. Known: {', '.join(bughost.BACTERIA)}")
+    ctx.log(f"{seed['bacterium']} targets: {', '.join(t['gene'] for t in seed['targets'])}")
+    targets = [{"gene": t["gene"], "query": t["query"], "role": t["role"], "weight": 1.0}
+               for t in seed["targets"]]
+    ranked, desc, tox, sol, agg = _compounds_for_targets(ctx, targets, max_compounds)
+
+    lines = [f"# Antibacterial repurposing: {seed['bacterium']}", "",
+             "Validated bacterial targets → their ChEMBL inhibitors as repurposing candidates. "
+             "Targets are bacterial proteins (resolved in ChEMBL by name), not in PrimeKG.", "",
+             "## Bacterial targets", "", "| # | Target | Role | ChEMBL inhibitors |", "|---|---|---|---|"]
+    for i, t in enumerate(targets, 1):
+        lines.append(f"| {i} | {t['gene']} | {t['role']} | {t.get('actives', 0)} |")
+    resolved = sum(1 for t in targets if t.get("actives"))
+    if resolved < len(targets):
+        lines += ["", f"_{len(targets) - resolved} target(s) returned no ChEMBL hits — the query name may need "
+                  "tuning for this organism._"]
+    lines += ["", "## Candidate antibacterial compounds", "",
+              "Measured inhibitors (pChEMBL ≥ 6) of the targets, scored by potency, bonus for hitting several "
+              "targets. Properties from RDKit; tox/solubility are baseline predictions — research signals, not assays.", "",
+              "| # | ChEMBL ID | Best target | pChEMBL | Hits | Score | MW | QED | ClinTox p | Flags |",
+              "|---|---|---|---|---|---|---|---|---|---|"]
+    for i, c in enumerate(ranked, 1):
+        d = desc.get(c["smiles"], {})
+        tp = tox.get(c["smiles"])
+        flags = _compound_flags(d, tp, sol.get(c["smiles"]))
+        lines.append(f"| {i} | {c.get('chembl_id') or '—'} | {c['target']} | {c['pchembl']:.2f} | "
+                     f"{len(c['targets_hit'])} | {c['score']:.2f} | {d.get('mol_weight', '—')} | "
+                     f"{d.get('qed', '—')} | {'—' if tp is None else f'{tp:.2f}'} | {', '.join(flags) or '—'} |")
+    lines += ["", "_Computational triage only — efficacy needs MIC/time-kill assays and resistance testing. "
+              "Not clinical advice._"]
+    return {"bacterium": seed["bacterium"], "targets": len(targets), "targets_resolved": resolved,
+            "candidates": len(ranked), "top_compound": ranked[0].get("chembl_id") if ranked else None}, lines
+
+
 # ---------------------------------------------------------------- Repurposing (general)
 
 def _compounds_for_targets(ctx, targets, max_compounds):
@@ -592,7 +636,7 @@ def _compounds_for_targets(ctx, targets, max_compounds):
         actives, n = [], 0
         ctx.log(f"ChEMBL inhibitors of {t['gene']}")
         try:
-            res = chembl.target_actives(t["gene"], limit=50)
+            res = chembl.target_actives(t.get("query") or t["gene"], limit=50)
             actives = res.get("actives", []) or []
             n = res.get("count", len(actives))
         except Exception as e:
