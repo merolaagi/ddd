@@ -113,7 +113,7 @@ PROMISCUOUS = {"UBC", "UBB", "UBA52", "RPS27A", "SUMO1", "SUMO2", "SUMO3",
 
 
 def predict_links(entity: str, target: str = "gene", k: int = 20,
-                  hub_cap: int = 800, shared_cap: int = 400, cand_cap: int = 600) -> dict:
+                  hub_cap: int = 800, shared_cap: int = 400, cand_cap: int = 1500) -> dict:
     """Rank NOVEL target-type nodes that the graph implies should link to
     `entity` but currently don't — ordered by Adamic-Adar. New hypotheses.
 
