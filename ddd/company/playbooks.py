@@ -446,6 +446,138 @@ def pub_weekly_digest(ctx, days: int = 7, check_repos: bool = True):
     return {"runs_in_window": len(recent), "index_entries": len(index), "public_page": page}, lines
 
 
+# ---------------------------------------------------------------- Antiviral repurposing
+
+def _role_weight(role: str) -> float:
+    r = (role or "").lower()
+    if "protease" in r:
+        return 1.0        # validated, druggable enzyme class
+    if "receptor" in r:
+        return 0.85
+    if "cofactor" in r or "polymerase" in r:
+        return 0.6
+    return 0.55
+
+
+def antiviral_repurposing(ctx, virus: str, top: int = 8, max_compounds: int = 20):
+    """Host-directed antiviral repurposing for a respiratory virus.
+
+    virus -> curated host dependency/entry factors -> ChEMBL inhibitors of those
+    host proteins (repurposing candidates) -> triaged and ranked by potency x
+    target importance, with a polypharmacology bonus for hitting several host
+    factors. Host-directed: harder for the virus to escape than direct-acting.
+    Not validated; needs antiviral assays and lung PK to confirm.
+    """
+    from ..sources import virhost, chembl
+    from ..chem import describe
+    from ..runner import predict
+
+    seed = virhost.link_virus_hosts(virus)
+    if not seed.get("found"):
+        raise ValueError(f"Unknown virus '{virus}'. Known: {', '.join(virhost.VIRUSES)}")
+    ctx.log(f"{seed['virus']} host factors: {', '.join(h['gene'] for h in seed['hosts'])}"
+            + (f" ({seed['written']} written to graph)" if seed.get("written") else ""))
+
+    targets, compounds = [], []
+    for h in seed["hosts"]:
+        w = _role_weight(h["role"])
+        actives, n = [], 0
+        ctx.log(f"ChEMBL inhibitors of {h['gene']}")
+        try:
+            res = chembl.target_actives(h["gene"], limit=50)
+            actives = res.get("actives", []) or []
+            n = res.get("count", len(actives))
+        except Exception as e:
+            ctx.log(f"  unavailable: {str(e)[:80]}")
+        targets.append({**h, "weight": w, "actives": n})
+        for a in actives:
+            try:
+                pc = float(a.get("pchembl") or 0)
+            except (TypeError, ValueError):
+                pc = 0.0
+            if a.get("smiles"):
+                compounds.append({"smiles": a["smiles"], "chembl_id": a.get("molecule_chembl_id"),
+                                  "pchembl": pc, "target": h["gene"], "role": h["role"],
+                                  "score": round(pc * w, 3)})
+
+    # One row per compound: best single-target score, plus how many host targets it hits.
+    agg = {}
+    for c in compounds:
+        k = c["chembl_id"] or c["smiles"]
+        a = agg.get(k)
+        if not a:
+            agg[k] = dict(c, targets_hit={c["target"]})
+        else:
+            a["targets_hit"].add(c["target"])
+            if c["score"] > a["score"]:
+                a.update({"score": c["score"], "pchembl": c["pchembl"], "target": c["target"], "role": c["role"]})
+    ranked = sorted(agg.values(), key=lambda c: (len(c["targets_hit"]), c["score"]), reverse=True)[:max_compounds]
+
+    # Safety/property triage on the shortlist (RDKit + baselines; best-effort).
+    smis = [c["smiles"] for c in ranked]
+    desc = {s: describe(s) for s in smis}
+    tox, sol = {}, {}
+    if smis:
+        try:
+            for s, p in zip(smis, predict("clintox", smis, "rf")):
+                if p.get("valid"):
+                    tox[s] = p["prediction"]
+        except Exception as e:
+            ctx.log(f"  clintox baseline unavailable: {str(e)[:80]}")
+        try:
+            for s, p in zip(smis, predict("esol", smis, "rf")):
+                if p.get("valid"):
+                    sol[s] = p["prediction"]
+        except Exception:
+            pass
+
+    trank = sorted(targets, key=lambda t: (t["weight"], t["actives"]), reverse=True)
+    lines = [f"# Antiviral repurposing: {seed['virus']}", "",
+             f"Host-directed strategy — rank human proteins the virus depends on, then the ChEMBL "
+             f"inhibitors of those proteins as repurposing candidates. Sources: curated host factors "
+             f"+ ChEMBL. Related disease in the graph: {seed['disease']}.", "",
+             "## Host-directed targets", "",
+             "Ranked by target class (entry proteases/receptors are the most tractable) and how many "
+             "measured inhibitors ChEMBL already has.", "",
+             "| # | Host factor | Role | Weight | ChEMBL inhibitors |", "|---|---|---|---|---|"]
+    for i, t in enumerate(trank, 1):
+        lines.append(f"| {i} | {t['gene']} | {t['role']} | {t['weight']:.2f} | {t['actives']} |")
+
+    lines += ["", "## Candidate antiviral compounds", "",
+              "Repurposing candidates: measured inhibitors (pChEMBL ≥ 6) of the host targets, scored by "
+              "**potency × target weight**, with a bonus for hitting several host factors (polypharmacology). "
+              "Properties from RDKit; tox/solubility are random-forest baselines — research signals, not assays.", "",
+              "| # | ChEMBL ID | Best host target | pChEMBL | Hits | Score | MW | QED | ClinTox p | Flags |",
+              "|---|---|---|---|---|---|---|---|---|---|"]
+    for i, c in enumerate(ranked, 1):
+        d = desc.get(c["smiles"], {})
+        flags = []
+        if d.get("valid"):
+            if d.get("lipinski_violations", 0) > 1:
+                flags.append("Ro5")
+            if d.get("qed", 1) < 0.3:
+                flags.append("low QED")
+        tp = tox.get(c["smiles"])
+        if tp is not None and tp > 0.5:
+            flags.append("tox risk")
+        if sol.get(c["smiles"]) is not None and sol[c["smiles"]] < -6:
+            flags.append("poor solubility")
+        lines.append(
+            f"| {i} | {c.get('chembl_id') or '—'} | {c['target']} | {c['pchembl']:.2f} | "
+            f"{len(c['targets_hit'])} | {c['score']:.2f} | "
+            f"{d.get('mol_weight', '—')} | {d.get('qed', '—')} | "
+            f"{'—' if tp is None else f'{tp:.2f}'} | {', '.join(flags) or '—'} |")
+
+    lines += ["", "_Host-directed candidates resist viral mutation better than direct-acting antivirals, "
+              "but this is a computational triage only: efficacy needs antiviral assays (viral-titre "
+              "reduction, selectivity index in cells) and lung pharmacokinetics. Not clinical advice._"]
+
+    return {"virus": seed["virus"], "host_targets": len(targets),
+            "candidates": len(ranked), "compounds_considered": len(agg),
+            "top_target": trank[0]["gene"] if trank else None,
+            "top_compound": ranked[0].get("chembl_id") if ranked else None}, lines
+
+
 # ---------------------------------------------------------------- Discovery programs
 
 def discovery_program(ctx, disease: str, molecules: str | list = "", top_targets: int = 15):

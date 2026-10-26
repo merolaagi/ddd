@@ -1,4 +1,4 @@
-# ddd · v0.9.7
+# ddd · v0.10.0
 
 **A headless drug-discovery intelligence company on one Mac.** No staff: six
 departments run as agents executing playbooks on a schedule or on request. The
@@ -142,6 +142,23 @@ from anywhere. Standard link-prediction over PrimeKG plus every enrichment edge.
 Tier 1 above needs no training and no extra deps. Tier 2 is learned node2vec
 embeddings (`kg_model.train_embeddings`, optional `gensim`) for similarity-based
 scoring once you want a trained model. Topological signal, not validated causality.
+
+## Antiviral repurposing
+
+The first composite model built on the foundations above — finds host-directed
+antiviral candidates for a respiratory virus, without a monolithic deep net.
+
+`antiviral_repurposing {virus}` (Discovery Programs): a respiratory virus →
+curated **host dependency / entry factors** (the human proteins it needs) →
+**ChEMBL inhibitors** of those proteins as repurposing candidates → triaged
+(RDKit + ADMET baselines) and ranked by **potency × target importance**, with a
+polypharmacology bonus for hitting several host factors. Host-directed on
+purpose: harder for the virus to mutate away than a direct-acting antiviral.
+
+Known viruses: SARS-CoV-2, influenza, RSV, rhinovirus, parainfluenza. The
+curated virus→host edges are written into the graph (`source=VirusHost`,
+`ddd/sources/virhost.py`); a live VirHostNet/IntAct connector can extend them
+later. Computational triage only — efficacy needs antiviral assays and lung PK.
 
 ## Knowledge graph viewer
 

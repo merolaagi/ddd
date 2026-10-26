@@ -89,6 +89,13 @@ PLAYBOOKS = {p.name: p for p in [
              "Properties, six baseline predictions and red flags for up to 50 SMILES.",
              {"smiles": {"type": "text", "default": "CC(=O)Oc1ccccc1C(=O)O\nCN1CCC[C@H]1c1cccnc1"},
               "label": {"type": "str", "default": ""}}, pb.chem_molecule_triage),
+    Playbook("antiviral_repurposing", "Antiviral repurposing", "programs",
+             "For a respiratory virus: host-directed targets (entry/replication factors) → their ChEMBL "
+             "inhibitors as repurposing candidates, triaged and ranked. Host-directed, not validated.",
+             {"virus": {"type": "str", "default": "sars-cov-2"},
+              "top": {"type": "int", "default": 8},
+              "max_compounds": {"type": "int", "default": 20}},
+             pb.antiviral_repurposing),
     Playbook("discovery_program", "Discovery program", "programs",
              "Disease → PrimeKG targets → molecule triage and ADMET/activity screen → program report. "
              "Runs the molecule screen even when the graph is offline.",
