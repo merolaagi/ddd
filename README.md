@@ -1,4 +1,4 @@
-# ddd · v0.9.0
+# ddd · v0.9.7
 
 **A headless drug-discovery intelligence company on one Mac.** No staff: six
 departments run as agents executing playbooks on a schedule or on request. The
@@ -192,15 +192,26 @@ the measured actives to dock.
 Engine and prep tools are **optional** and not in `requirements.txt` (they're
 heavy and you're the one watching disk). The tool detects what's on the host
 and, if something's missing, returns the exact install line instead of failing.
-Install a working stack on the Mac with one of:
+
+On **Apple Silicon** there's no pip wheel for `vina` (it tries to compile and
+can't find Boost), so use the conda-forge build and point ddd at it:
 
 ```
-brew install smina open-babel
+brew install micromamba
+micromamba create -y -n dock -c conda-forge vina openbabel
+.venv/bin/pip install meeko
 ```
 
+then in `~/Sites/ddd/.env`:
+
 ```
-.venv/bin/pip install vina meeko
+DDD_DOCK_VINA=micromamba run -n dock vina
+DDD_DOCK_OBABEL=micromamba run -n dock obabel
 ```
+
+(On Linux / Intel, `.venv/bin/pip install vina meeko` and `apt/brew` Open Babel
+also work; the tool auto-detects the vina Python module or a `vina`/`smina` on
+PATH. `DDD_DOCK_VINA` / `DDD_DOCK_OBABEL` override detection.)
 
 Caveats, stated on every result: AlphaFold models are **apo** (no
 ligand-shaped pocket) and the default box is a **blind** box over the whole

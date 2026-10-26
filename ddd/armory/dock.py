@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import tempfile
@@ -29,6 +30,11 @@ from pathlib import Path
 import httpx
 
 from .paths import DIRS, stamp_name
+
+# Let the host point at a docking engine / Open Babel installed anywhere, e.g. a
+# conda-forge env on Apple Silicon:  DDD_DOCK_VINA="micromamba run -n dock vina"
+VINA_CMD = os.environ.get("DDD_DOCK_VINA", "").strip()
+OBABEL_CMD = os.environ.get("DDD_DOCK_OBABEL", "").strip()
 
 STRUCT = DIRS["har"].parent / "structures"
 STRUCT.mkdir(parents=True, exist_ok=True)
@@ -134,17 +140,17 @@ def _prep_ligand_meeko(smiles: str, out: Path) -> None:
     except ImportError:
         pass
     # fall back to obabel CLI
-    if _which("obabel"):
+    ob = _obabel()
+    if ob:
         with tempfile.NamedTemporaryFile("w", suffix=".mol", delete=False) as f:
             f.write(Chem.MolToMolBlock(mol)); molf = f.name
-        subprocess.run(["obabel", molf, "-O", str(out), "-xh"], check=True,
+        subprocess.run(ob + [molf, "-O", str(out), "-xh"], check=True,
                        capture_output=True, text=True)
         os.unlink(molf)
         return
     raise ToolMissing(
-        "No ligand-prep tool. Install either:\n"
-        "  .venv/bin/pip install meeko\n"
-        "  brew install open-babel")
+        "No ligand-prep tool. Install meeko (.venv/bin/pip install meeko) or "
+        "Open Babel (conda-forge openbabel / brew install open-babel).")
 
 
 def _prep_receptor(pdb: Path, out: Path) -> None:
@@ -155,14 +161,14 @@ def _prep_receptor(pdb: Path, out: Path) -> None:
                         "-p"], check=True, capture_output=True, text=True)
         if out.exists():
             return
-    if _which("obabel"):
-        subprocess.run(["obabel", str(pdb), "-O", str(out), "-xr"], check=True,
+    ob = _obabel()
+    if ob:
+        subprocess.run(ob + [str(pdb), "-O", str(out), "-xr"], check=True,
                        capture_output=True, text=True)
         return
     raise ToolMissing(
-        "No receptor-prep tool. Install either:\n"
-        "  brew install open-babel\n"
-        "  .venv/bin/pip install meeko")
+        "No receptor-prep tool. Install Open Babel (conda-forge openbabel, or "
+        "brew install open-babel) and set DDD_DOCK_OBABEL, or pip install meeko.")
 
 
 # ------------------------------------------------------------------ engine
@@ -181,7 +187,7 @@ def _run_vina_py(rec: Path, lig: Path, box: dict, out: Path, exhaustiveness: int
 
 def _run_cli(engine: str, rec: Path, lig: Path, box: dict, out: Path, exhaustiveness: int, n_poses: int):
     c, s = box["center"], box["size"]
-    cmd = [engine, "--receptor", str(rec), "--ligand", str(lig),
+    cmd = shlex.split(engine) + ["--receptor", str(rec), "--ligand", str(lig),
            "--center_x", str(c[0]), "--center_y", str(c[1]), "--center_z", str(c[2]),
            "--size_x", str(s[0]), "--size_y", str(s[1]), "--size_z", str(s[2]),
            "--exhaustiveness", str(exhaustiveness), "--num_modes", str(n_poses),
@@ -198,12 +204,22 @@ def _run_cli(engine: str, rec: Path, lig: Path, box: dict, out: Path, exhaustive
     return scores
 
 
+def _obabel():
+    """Open Babel invocation as a token list, or None. Honors DDD_DOCK_OBABEL."""
+    if OBABEL_CMD:
+        return shlex.split(OBABEL_CMD)
+    w = _which("obabel")
+    return [w] if w else None
+
+
 def _engine():
     try:
         import vina  # noqa: F401
         return ("py", None)
     except Exception:
         pass
+    if VINA_CMD:
+        return ("cli", VINA_CMD)
     for cli in ("smina", "vina"):
         if _which(cli):
             return ("cli", cli)
@@ -222,10 +238,14 @@ def dock(target: str, smiles: str, exhaustiveness: int = 8, n_poses: int = 9,
     kind, engine = _engine()
     if kind is None:
         return {"ok": False, "need": "docking engine",
-                "install": "Pick one:\n"
-                           "  .venv/bin/pip install vina meeko\n"
-                           "  brew install smina open-babel",
-                "note": "No Vina python module and no smina/vina on PATH."}
+                "install": "Apple Silicon (no pip wheel for vina): use conda-forge --\n"
+                           "  brew install micromamba\n"
+                           "  micromamba create -y -n dock -c conda-forge vina openbabel\n"
+                           "  .venv/bin/pip install meeko\n"
+                           "then in ~/Sites/ddd/.env set:\n"
+                           "  DDD_DOCK_VINA=micromamba run -n dock vina\n"
+                           "  DDD_DOCK_OBABEL=micromamba run -n dock obabel",
+                "note": "No vina python module, no DDD_DOCK_VINA, no smina/vina on PATH."}
 
     # resolve + fetch structure
     info = resolve_uniprot(target)
