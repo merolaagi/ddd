@@ -49,6 +49,13 @@ Schedules fire while the server runs. Formats: `hourly`, `daily HH:MM`,
 **Optional narrator:** set `DDD_NARRATOR=<ollama model>` in `.env` and every
 report gets a short executive summary written by that local model.
 
+**Proactive agents.** Every run ends with a reasoned **Recommended next steps**
+section — what to do with that result and why (a target dossier suggests ranking
+its compounds; a repurposing run suggests docking the top target; a watchlist
+change suggests publishing a digest). Set `"autopilot": true` in the charter and
+the agent **runs** the chainable recommendation on its own, bounded to 2 hops so
+it can't run away. Off by default; nothing fires automatically until you enable it.
+
 ## Operating it from Claude (no API spend)
 
 The MCP server exposes `company_overview`, `company_run`,

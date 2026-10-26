@@ -149,12 +149,65 @@ def _narrate(lines):
         return None
 
 
-def _execute(run_id, book: Playbook, params):
+MAX_CHAIN = 2  # how many autopilot hops a single run may trigger
+
+
+def recommend_next(playbook: str, summary) -> list:
+    """What the agent should do next given a result. Each rec has a label, a
+    reason, and either a `playbook` (chainable) or a `tool`; `auto` marks the
+    ones autopilot may run on its own."""
+    s = summary if isinstance(summary, dict) else {}
+    recs = []
+    if playbook == "bio_target_dossier":
+        d = s.get("disease")
+        if d:
+            recs.append({"label": f"Rank compounds for {d}", "playbook": "disease_repurposing",
+                         "params": {"disease": d}, "auto": True,
+                         "why": "Turn these ranked targets into candidate drugs."})
+    elif playbook in ("disease_repurposing", "antiviral_repurposing", "antibacterial_repurposing"):
+        tgt = s.get("top_target")
+        if tgt:
+            recs.append({"label": f"Dock candidates against {tgt}", "tool": "dock",
+                         "params": {"target": tgt}, "auto": False,
+                         "why": "Add a structural binding score to the top target."})
+        recs.append({"label": "Keep the ADMET/safety baselines current", "playbook": "bench_full_sweep",
+                     "params": {}, "auto": False,
+                     "why": "These baselines flag the candidates' tox and solubility."})
+    elif playbook == "intel_watchlist_sweep":
+        if s.get("changed"):
+            recs.append({"label": "Publish an updated digest", "playbook": "pub_weekly_digest",
+                         "params": {}, "auto": True,
+                         "why": "A watched platform changed — refresh the public index and digest."})
+    elif playbook == "bench_full_sweep":
+        if s.get("regressions"):
+            recs.append({"label": "Investigate regressions", "params": {}, "auto": False,
+                         "why": f"{s['regressions']} task(s) scored worse than before — data or code changed."})
+        recs.append({"label": "Publish the leaderboard", "playbook": "pub_weekly_digest",
+                     "params": {}, "auto": False, "why": "Push the refreshed ddd score to the public page."})
+    elif playbook == "discovery_program":
+        d = s.get("disease")
+        if d:
+            recs.append({"label": f"Repurposing dossier for {d}", "playbook": "disease_repurposing",
+                         "params": {"disease": d}, "auto": False,
+                         "why": "Broaden from the screened set to all known modulators."})
+    return recs
+
+
+def _execute(run_id, book: Playbook, params, chain_depth: int = 0):
     ctx = Ctx(run_id)
+    recs, ok = [], False
     with _slots:
         try:
             ctx.log(f"{DEPT[book.department].agent} starts {book.title}")
             summary, lines = book.fn(ctx, **params)
+            recs = recommend_next(book.name, summary)
+            if recs:
+                lines += ["", "## Recommended next steps", ""]
+                for r in recs:
+                    tag = r.get("playbook") or r.get("tool")
+                    lines.append(f"- **{r['label']}** — {r['why']}" + (f" (`{tag}`)" if tag else ""))
+                if isinstance(summary, dict):
+                    summary["next_actions"] = recs
             exec_sum = _narrate(lines)
             if exec_sum:
                 lines = lines[:1] + ["", f"**Executive summary ({NARRATOR}):** {exec_sum}", ""] + lines[1:]
@@ -162,10 +215,21 @@ def _execute(run_id, book: Playbook, params):
             path.write_text("\n".join(lines) + f"\n\n---\nRun r{run_id} · {book.name} · {time.strftime('%Y-%m-%d %H:%M')}\n")
             db.run_finish(run_id, "done", summary, path.name)
             ctx.log("Done")
+            ok = True
         except Exception as e:
             ctx.log(f"Error: {e}")
             ctx.log(traceback.format_exc()[-800:])
             db.run_finish(run_id, "error", {"error": str(e)[:300]})
+    # Autopilot: after the slot is freed, bounded and opt-in (charter "autopilot": true).
+    if ok and chain_depth < MAX_CHAIN:
+        try:
+            if charter_mod.load().get("autopilot"):
+                auto = next((r for r in recs if r.get("auto") and r.get("playbook")), None)
+                if auto:
+                    db.run_log(run_id, f"Autopilot → {auto['playbook']}")
+                    start(auto["playbook"], auto["params"], trigger=f"autopilot r{run_id}", chain_depth=chain_depth + 1)
+        except Exception as e:
+            db.run_log(run_id, f"Autopilot skipped: {str(e)[:80]}")
 
 
 def _clean(book: Playbook, params):
@@ -181,13 +245,13 @@ def _clean(book: Playbook, params):
     return out
 
 
-def start(name: str, params: dict | None = None, trigger: str = "manual") -> int:
+def start(name: str, params: dict | None = None, trigger: str = "manual", chain_depth: int = 0) -> int:
     if name not in PLAYBOOKS:
         raise KeyError(f"unknown playbook '{name}'. Known: {', '.join(PLAYBOOKS)}")
     book = PLAYBOOKS[name]
     clean = _clean(book, params)
     run_id = db.run_create(name, DEPT[book.department].name, clean, trigger)
-    threading.Thread(target=_execute, args=(run_id, book, clean), daemon=True).start()
+    threading.Thread(target=_execute, args=(run_id, book, clean, chain_depth), daemon=True).start()
     return run_id
 
 
