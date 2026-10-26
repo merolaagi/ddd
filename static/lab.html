@@ -225,6 +225,21 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:
 #tourCard .count{font-size:11px;color:var(--muted);margin-right:auto;font-family:"JetBrains Mono",monospace}
 @media(max-width:560px){#tourCard{left:16px;right:16px;bottom:16px;max-width:none}}
 
+.coach-btn{border:1px solid color-mix(in srgb,var(--accent) 40%,var(--line));background:var(--accent-soft);color:var(--accent);border-radius:7px;padding:5px 11px;font:600 12px "Hanken Grotesk",sans-serif;cursor:pointer;white-space:nowrap}
+.coach-btn:hover{border-color:var(--accent)}
+.coach-flash{box-shadow:0 0 0 3px var(--accent)!important;border-radius:12px;transition:box-shadow .3s}
+#coachPanel{position:fixed;right:22px;bottom:22px;z-index:9997;width:330px;max-width:calc(100vw - 32px);background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:12px;box-shadow:0 14px 44px rgba(8,16,34,.3);padding:14px 16px 15px;color:var(--ink)}
+#coachPanel .ch{display:flex;align-items:center;gap:7px;font-family:"Space Grotesk",sans-serif;font-weight:600;font-size:13px;color:var(--accent);margin-bottom:8px}
+#coachPanel .ch .dot{width:8px;height:8px;border-radius:50%;background:var(--ok);animation:cpulse 1.6s ease-in-out infinite}
+@keyframes cpulse{0%,100%{opacity:1}50%{opacity:.3}}
+@media(prefers-reduced-motion:reduce){#coachPanel .ch .dot{animation:none}}
+#coachPanel .x{margin-left:auto;background:none;border:0;color:var(--muted);font:500 11px "Hanken Grotesk",sans-serif;cursor:pointer;padding:0}
+#coachPanel .x:hover{color:var(--ink)}
+#coachPanel p{margin:0 0 11px;font-size:13.5px;line-height:1.5}
+#coachPanel p b{color:var(--ink)}
+#coachPanel .k{font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--accent)}
+@media(max-width:560px){#coachPanel{left:16px;right:16px;bottom:16px;width:auto}}
+
 </style>
 <script>(function(){try{var t=localStorage.getItem("ddd-theme")||"light";document.documentElement.setAttribute("data-theme",t);}catch(e){document.documentElement.setAttribute("data-theme","light");}})();</script>
 </head>
@@ -234,6 +249,7 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:
   <h1><span>ddd</span> Lab</h1>
   <p class="sub">Hands-on tools behind the departments: benchmarks, molecule tools, the Tools Armory and the knowledge graph.</p>
   <div class="pills" id="pills"></div>
+  <button class="coach-btn" id="coachBtn" onclick="coachToggle()">Coach: on</button>
   <button class="tour-start" onclick="startTour()">Take the tour</button>
   <button class="theme-btn" id="themeBtn" onclick="toggleTheme()" aria-label="Switch between light and dark"></button>
 </header>
@@ -843,6 +859,107 @@ function tourGo(i){
   document.body.appendChild(c);
 }
 (function(){var s=_tload();if(s&&s.active){setTimeout(function(){tourGo(s.i);},350);}})();
+
+</script>
+<script>
+
+/* ---- Coach: reactive, watches real API results, interprets, suggests next ---- */
+const COACH_KEY='ddd_coach_off';
+function coachOn(){try{return localStorage.getItem(COACH_KEY)!=='1';}catch(e){return true;}}
+function coachOff(){try{localStorage.setItem(COACH_KEY,'1');}catch(e){}var c=document.getElementById('coachPanel');if(c)c.remove();renderCoachBtn();}
+function coachEnable(){try{localStorage.setItem(COACH_KEY,'0');}catch(e){}renderCoachBtn();coachHello();}
+function coachToggle(){coachOn()?coachOff():coachEnable();}
+function renderCoachBtn(){var b=document.getElementById('coachBtn');if(b)b.textContent='Coach: '+(coachOn()?'on':'off');}
+
+var COACH_NEXT=null;
+function coachShow(say,next){
+  if(!coachOn())return;
+  var c=document.getElementById('coachPanel');
+  if(!c){c=document.createElement('div');c.id='coachPanel';document.body.appendChild(c);}
+  c.innerHTML='<div class="ch"><span class="dot"></span>Coach<button class="x" onclick="coachOff()">turn off</button></div>'+
+    '<p>'+say+'</p>'+(next?('<button class="small" onclick="coachNext()">'+esc(next.label)+' →</button>'):'');
+  COACH_NEXT=next||null;
+}
+function coachNext(){if(COACH_NEXT)coachGoto(COACH_NEXT);}
+function coachGoto(n){
+  var el=document.querySelector(n.sel);if(!el)return;
+  el.scrollIntoView({behavior:'smooth',block:'start'});
+  el.classList.add('coach-flash');setTimeout(function(){el.classList.remove('coach-flash');},1600);
+  if(n.focus){var inp=document.querySelector(n.focus);if(inp){if(n.prefill&&!inp.value)inp.value=n.prefill;setTimeout(function(){inp.focus();},500);}}
+}
+function coachHello(){
+  coachShow("Hi — I'll follow along, read each result and tell you the next move. Start by mapping a disease in the <b>knowledge graph</b>.",
+    {label:"Go to the graph",sel:"#kgsec",focus:"#kgq",prefill:"idiopathic pulmonary fibrosis"});
+}
+
+function _num(x){return (x==null)?'—':x;}
+function coachReact(url,d){
+  if(!coachOn()||!d)return;
+  try{
+    if(/\/api\/kg\/subgraph/.test(url)){
+      if(d.found){coachShow("You mapped <b>"+esc(d.center)+"</b>: <b>"+d.counts.nodes+"</b> nodes, <b>"+d.counts.edges+"</b> links. Dots are genes, diseases and drugs; lines are real biological links. Double-click any dot to grow it.",
+        {label:"Ask if two things are linked",sel:"#hypsec",focus:"#hypA"});}
+      else coachShow("No entity named that in the graph. Try the exact name — use <b>Search</b> to find it.",null);
+      return;
+    }
+    if(/\/api\/kg\/hypothesis/.test(url)){
+      if(!d.found){coachShow("That entity isn't in the graph — check the spelling or search for it.",null);return;}
+      var s=d.scores, linked=d.direct_link?("Already linked ("+esc(d.direct_relations.join(', '))+")."):("Not a direct link yet.");
+      coachShow("<b>"+esc(d.a.name)+" ↔ "+esc(d.b.name)+"</b>: <b>"+esc(d.plausibility)+"</b>. "+linked+" "+s.common_neighbors+" shared neighbours, Adamic-Adar <span class='k'>"+s.adamic_adar+"</span>. "+esc(d.reading),
+        {label:"Now ask for NEW targets",sel:"#hypsec",focus:"#predE",prefill:d.b.type==='disease'?d.b.name:d.a.name});
+      return;
+    }
+    if(/\/api\/kg\/predict/.test(url)){
+      if(d.error){coachShow("Prediction couldn't run: "+esc(d.error),null);return;}
+      var ps=d.predictions||[];if(!ps.length){coachShow("No novel candidates — the neighbourhood is thin. Try enriching the disease from Open Targets first.",{label:"Enrich from Open Targets",sel:"#srcsec",focus:"#otdis",prefill:d.entity.name});return;}
+      var top=ps[0], drug=ps.filter(function(p){return p.known_drugs>0;}).slice(0,3).map(function(p){return p.name;});
+      coachShow("<b>"+ps.length+"</b> novel "+esc(d.target_type)+" ideas for <b>"+esc(d.entity.name)+"</b>. Top: <b>"+esc(top.name)+"</b> (Adamic-Adar <span class='k'>"+top.adamic_adar+"</span>"+(top.known_drugs?", "+top.known_drugs+" drugs":"")+"). "+(drug.length?("Druggable leads: <b>"+esc(drug.join(', '))+"</b>. "):"")+"These are hypotheses to test — see where they sit in the cell, or dock one.",
+        {label:"See them in the cell",sel:"#cellsec",focus:"#cellDis",prefill:d.entity.name});
+      return;
+    }
+    if(/\/api\/vcell\/cell/.test(url)){
+      if(!d.found){coachShow("No disease by that name in the graph.",null);return;}
+      var comps=Object.keys(d.compartments||{}).length;
+      coachShow("Cell built for <b>"+esc(d.disease)+"</b>: <b>"+d.proteins.length+"</b> proteins across <b>"+comps+"</b> compartments, "+(d.links?d.links.length:0)+" interactions. Membrane proteins (the ring) are often the most druggable. Hover any protein to inspect it.",
+        {label:"Run a full discovery program",sel:"#company",focus:"#disease",prefill:d.disease});
+      return;
+    }
+    if(/\/api\/sources\//.test(url)){
+      if(d.written!=null){coachShow("Added <b>"+d.written+"</b> edges from <b>"+(url.indexOf('opentargets')>-1?'Open Targets':'ChEMBL')+"</b>. Your graph just grew with fresh evidence — predictions will now use it.",
+        {label:"Re-run prediction",sel:"#hypsec",focus:"#predE"});}
+      return;
+    }
+    if(/\/api\/jobs\//.test(url)&&d.status==='done'&&d.result){
+      var r=d.result;
+      if(r.ranking||(r.results&&r.results[0]&&('best_affinity' in r.results[0]))){
+        if(r.ok===false){coachShow("Docking needs a step: "+esc((r.error||r.need||'')+''),null);return;}
+        var best=(r.ranking&&r.ranking[0])?r.ranking[0].best_affinity:(r.results&&r.results[0]?r.results[0].best_affinity:null);
+        coachShow("Docked into <b>"+esc((r.target&&r.target.name)||'target')+"</b>: best affinity <b class='k'>"+_num(best)+"</b> kcal/mol (more negative = tighter fit). That's the full chain — <b>graph → target → docked compound</b>, all on your Mac.",
+          {label:"Back to the graph",sel:"#kgsec"});
+        return;
+      }
+      if(r.report){coachShow("Program finished — the written report is in the panel on the right. It ranked targets and screened your molecules end to end.",
+        {label:"Explore the graph",sel:"#kgsec"});return;}
+    }
+  }catch(e){}
+}
+
+/* observe real API traffic without touching any existing function */
+(function(){
+  var _f=window.fetch;
+  window.fetch=function(){
+    var args=arguments, p=_f.apply(this,args);
+    try{
+      var url=(typeof args[0]==='string')?args[0]:((args[0]&&args[0].url)||'');
+      if(coachOn()&&/\/api\/(kg\/(subgraph|hypothesis|predict)|vcell\/cell|sources\/|jobs\/)/.test(url)){
+        p.then(function(r){r.clone().json().then(function(d){coachReact(url,d);}).catch(function(){});}).catch(function(){});
+      }
+    }catch(e){}
+    return p;
+  };
+  renderCoachBtn();
+  if(coachOn())setTimeout(coachHello,600);
+})();
 
 </script>
 <script>function toggleTheme(){var h=document.documentElement;var n=h.getAttribute("data-theme")==="dark"?"light":"dark";h.setAttribute("data-theme",n);try{localStorage.setItem("ddd-theme",n);}catch(e){}paintThemeBtn();}function paintThemeBtn(){var b=document.getElementById("themeBtn");if(b)b.textContent=document.documentElement.getAttribute("data-theme")==="dark"?"\u2600 Light":"\u263e Dark";}paintThemeBtn();</script>
