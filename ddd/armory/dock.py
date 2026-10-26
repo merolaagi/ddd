@@ -247,27 +247,28 @@ def dock(target: str, smiles: str, exhaustiveness: int = 8, n_poses: int = 9,
                            "  DDD_DOCK_OBABEL=micromamba run -n dock obabel",
                 "note": "No vina python module, no DDD_DOCK_VINA, no smina/vina on PATH."}
 
-    # resolve + fetch structure
-    info = resolve_uniprot(target)
-    pdb = fetch_alphafold(info["accession"])
-
-    if center.strip():
-        cx, cy, cz = [float(x) for x in center.replace(" ", "").split(",")]
-        side = size or 22.0
-        box = {"center": [cx, cy, cz], "size": [side, side, side], "blind": False}
-    else:
-        box = box_from_pdb(pdb)
-
-    ligs = [s.strip() for s in smiles.replace(",", "\n").splitlines() if s.strip()]
-    if not ligs:
-        raise ValueError("no SMILES given")
-
-    rec_pdbqt = STRUCT / f"AF-{info['accession']}-F1-v4.pdbqt"
+    import traceback
     try:
+        info = resolve_uniprot(target)
+        pdb = fetch_alphafold(info["accession"])
+        if center.strip():
+            cx, cy, cz = [float(x) for x in center.replace(" ", "").split(",")]
+            side = size or 22.0
+            box = {"center": [cx, cy, cz], "size": [side, side, side], "blind": False}
+        else:
+            box = box_from_pdb(pdb)
+        ligs = [s.strip() for s in smiles.replace(",", "\n").splitlines() if s.strip()]
+        if not ligs:
+            return {"ok": False, "error": "no SMILES given"}
+        rec_pdbqt = STRUCT / f"AF-{info['accession']}-F1-v4.pdbqt"
         if not rec_pdbqt.exists():
             _prep_receptor(pdb, rec_pdbqt)
     except ToolMissing as e:
-        return {"ok": False, "need": "receptor prep", "install": str(e)}
+        return {"ok": False, "need": "prep tool", "install": str(e)}
+    except Exception as e:
+        return {"ok": False, "error": f"dock setup failed: {str(e)[:300]}",
+                "stage": "resolve/fetch/receptor-prep", "engine": engine,
+                "trace": traceback.format_exc()[-600:]}
 
     results = []
     with tempfile.TemporaryDirectory() as td:
@@ -277,8 +278,8 @@ def dock(target: str, smiles: str, exhaustiveness: int = 8, n_poses: int = 9,
                 _prep_ligand_meeko(smi, lig_pdbqt)
             except ToolMissing as e:
                 return {"ok": False, "need": "ligand prep", "install": str(e)}
-            except ValueError as e:
-                results.append({"smiles": smi, "error": str(e)})
+            except Exception as e:
+                results.append({"smiles": smi, "error": f"ligand prep: {str(e)[:250]}"})
                 continue
             out = DOCK / stamp_name(f"{info['accession']}-lig{i}", "pdbqt")
             try:
@@ -287,7 +288,10 @@ def dock(target: str, smiles: str, exhaustiveness: int = 8, n_poses: int = 9,
                 else:
                     scores = _run_cli(engine, rec_pdbqt, lig_pdbqt, box, out, exhaustiveness, n_poses)
             except subprocess.CalledProcessError as e:
-                results.append({"smiles": smi, "error": (e.stderr or str(e))[-300:]})
+                results.append({"smiles": smi, "error": "vina/engine: " + (e.stderr or str(e))[-250:]})
+                continue
+            except Exception as e:
+                results.append({"smiles": smi, "error": f"docking: {str(e)[:250]}"})
                 continue
             results.append({
                 "smiles": smi,
