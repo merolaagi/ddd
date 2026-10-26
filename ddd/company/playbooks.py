@@ -590,8 +590,8 @@ def antibacterial_repurposing(ctx, bacterium: str, max_compounds: int = 20):
     if not seed.get("found"):
         raise ValueError(f"Unknown bacterium '{bacterium}'. Known: {', '.join(bughost.BACTERIA)}")
     ctx.log(f"{seed['bacterium']} targets: {', '.join(t['gene'] for t in seed['targets'])}")
-    targets = [{"gene": t["gene"], "query": t["query"], "role": t["role"], "weight": 1.0}
-               for t in seed["targets"]]
+    targets = [{"gene": t["gene"], "query": t["query"], "role": t["role"], "weight": 1.0,
+                "organism": seed["bacterium"]} for t in seed["targets"]]
     ranked, desc, tox, sol, agg = _compounds_for_targets(ctx, targets, max_compounds)
 
     lines = [f"# Antibacterial repurposing: {seed['bacterium']}", "",
@@ -636,7 +636,8 @@ def _compounds_for_targets(ctx, targets, max_compounds):
         actives, n = [], 0
         ctx.log(f"ChEMBL inhibitors of {t['gene']}")
         try:
-            res = chembl.target_actives(t.get("query") or t["gene"], limit=50)
+            res = chembl.target_actives(t.get("query") or t["gene"], limit=50,
+                                        organism=t.get("organism"))
             actives = res.get("actives", []) or []
             n = res.get("count", len(actives))
         except Exception as e:

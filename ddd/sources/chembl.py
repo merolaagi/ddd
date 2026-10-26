@@ -22,27 +22,45 @@ def _get(path: str, params: dict) -> dict:
     return r.json()
 
 
-def resolve_target(symbol: str) -> dict | None:
-    """Gene symbol -> ChEMBL single-protein human target."""
-    d = _get("target/search", {"q": symbol, "limit": 10})
-    human = [t for t in d.get("targets", [])
-             if t.get("organism") == "Homo sapiens" and t.get("target_type") == "SINGLE PROTEIN"]
-    pick = (human or d.get("targets", []) or [None])[0]
+def resolve_target(symbol: str, organism: str | None = None) -> dict | None:
+    """Gene symbol / protein name -> ChEMBL single-protein target. With no
+    organism, prefers the human single protein; with an organism (e.g. a
+    bacterium), prefers a single protein whose organism matches it."""
+    d = _get("target/search", {"q": symbol, "limit": 15})
+    targets = d.get("targets", [])
+    sp = lambda t: t.get("target_type") == "SINGLE PROTEIN"
+    if organism:
+        o = organism.lower()
+        cand = [t for t in targets if o in (t.get("organism") or "").lower() and sp(t)] \
+            or [t for t in targets if o in (t.get("organism") or "").lower()]
+    else:
+        cand = [t for t in targets if t.get("organism") == "Homo sapiens" and sp(t)]
+    pick = (cand or targets or [None])[0]
     if not pick:
         return None
     return {"target_chembl_id": pick["target_chembl_id"], "pref_name": pick.get("pref_name"),
             "organism": pick.get("organism")}
 
 
-def target_actives(symbol: str, standard_type: str = "IC50", limit: int = 50,
-                   min_pchembl: float = 6.0) -> dict:
-    """Potent measured compounds for a target (pChEMBL >= min_pchembl ~ <=1 uM)."""
-    tgt = resolve_target(symbol)
-    if not tgt:
-        return {"found": False, "query": symbol}
-    d = _get("activity", {"target_chembl_id": tgt["target_chembl_id"],
-                          "standard_type": standard_type, "pchembl_value__gte": min_pchembl,
-                          "limit": min(limit, 200), "offset": 0})
+def target_actives(symbol: str, standard_type: str | None = None, limit: int = 50,
+                   min_pchembl: float = 6.0, organism: str | None = None,
+                   target_chembl_id: str | None = None) -> dict:
+    """Potent measured compounds for a target (pChEMBL >= min_pchembl ~ <=1 uM).
+    standard_type None = any assay type (so bacterial MIC data is included).
+    Pass organism for non-human targets, or target_chembl_id to skip resolution."""
+    pref = None
+    if target_chembl_id:
+        tid = target_chembl_id
+    else:
+        tgt = resolve_target(symbol, organism)
+        if not tgt:
+            return {"found": False, "query": symbol}
+        tid, pref = tgt["target_chembl_id"], tgt["pref_name"]
+    params = {"target_chembl_id": tid, "pchembl_value__gte": min_pchembl,
+              "limit": min(limit, 200), "offset": 0}
+    if standard_type:
+        params["standard_type"] = standard_type
+    d = _get("activity", params)
     rows = []
     for a in d.get("activities", []):
         rows.append({"molecule_chembl_id": a.get("molecule_chembl_id"),
@@ -50,8 +68,8 @@ def target_actives(symbol: str, standard_type: str = "IC50", limit: int = 50,
                      "standard_type": a.get("standard_type"),
                      "value": a.get("standard_value"), "units": a.get("standard_units"),
                      "smiles": a.get("canonical_smiles")})
-    return {"found": True, "symbol": symbol, "target_chembl_id": tgt["target_chembl_id"],
-            "pref_name": tgt["pref_name"], "standard_type": standard_type,
+    return {"found": True, "symbol": symbol, "target_chembl_id": tid,
+            "pref_name": pref, "standard_type": standard_type or "any",
             "count": len(rows), "actives": rows}
 
 

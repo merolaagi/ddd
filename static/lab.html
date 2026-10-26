@@ -292,6 +292,20 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:
       <div><h3 class="h3">Program report</h3><pre id="progReport" class="mono" style="max-height:520px">—</pre></div>
     </div>
   </section>
+  <section class="w12" id="repsec">
+    <h2>Repurposing programs</h2>
+    <p class="muted" style="font-size:13px;margin:-4px 0 12px">Find candidate drugs for a viral, human, or bacterial disease: targets &rarr; ChEMBL inhibitors &rarr; triaged, ranked repurposing candidates. Runs a Discovery Programs agent and writes a dossier.</p>
+    <div class="row">
+      <select id="repMode" onchange="repMode()" style="flex:0;min-width:150px">
+        <option value="disease">Human disease</option>
+        <option value="viral">Viral</option>
+        <option value="bacterial">Bacterial</option>
+      </select>
+      <input id="repName" placeholder="rheumatoid arthritis, type 2 diabetes, lung cancer">
+      <button onclick="runRep()">Run repurposing</button>
+    </div>
+    <pre id="repOut" class="mono" style="max-height:540px">Pick a mode, type a disease / virus / bacterium, and Run.</pre>
+  </section>
   <section class="w6" id="indexsec">
     <h2>Benchmark Index</h2>
     <p class="muted" style="font-size:13px;margin:-4px 0 10px">Open benchmarks, each with a known caveat. O3DC-style, local and extensible.</p>
@@ -833,6 +847,8 @@ const TOUR=[
  {page:'lab', sel:'#hypsec', title:'Ask it questions', body:'Check whether two things are linked and how believable it is — or ask for NOVEL targets the graph implies but was never told. Fresh, testable hypotheses.'},
  {page:'lab', sel:'#cellsec', title:'See it as a living cell', body:'Type a disease and Build cell: its target proteins appear in their real compartments — nucleus, membrane, and so on — and move.'},
  {page:'lab', sel:'#company', title:'Run a full program', body:'Give it a disease and the agents rank targets, screen molecules and write a report, end to end.'},
+ {page:'lab', sel:'#repsec', title:'Find candidate drugs', body:'Pick a human disease, a virus, or a bacterium, type a name and Run — it ranks real ChEMBL compounds as repurposing candidates, triaged for safety.'},
+ {page:'lab', sel:'#srcsec', title:'Grow the graph with evidence', body:'Pull fresh Open Targets / ChEMBL evidence into the graph on demand; predictions and dossiers then use it.'},
  {page:'lab', sel:'#armory', title:'Go deeper: dock & recon', body:'Dock a molecule against a target’s 3-D shape for a binding score, or map what rival drug-discovery sites expose. That’s the tour — explore freely from here.'},
 ];
 const TPAGE = location.pathname.replace(/\/+$/,'')==='/lab' ? 'lab' : 'hq';
@@ -896,6 +912,7 @@ function _num(x){return (x==null)?'—':x;}
 function coachReact(url,d){
   if(!coachOn()||!d)return;
   try{
+    if(/\/api\/company\/runs\//.test(url)&&d.status==="done"&&/repurposing/.test(d.playbook||"")&&d.summary){var s=d.summary;coachShow("Repurposing done for <b>"+esc(s.disease||s.virus||s.bacterium||"")+"</b>: <b>"+(s.candidates||0)+"</b> ranked candidates"+(s.top_target?(", top target <b>"+esc(s.top_target)+"</b>"):"")+". The dossier flags developability (peptides, Ro5, tox) so the drug-like leads stand out.",{label:"Explore the graph",sel:"#kgsec"});return;}
     if(/\/api\/kg\/subgraph/.test(url)){
       if(d.found){coachShow("You mapped <b>"+esc(d.center)+"</b>: <b>"+d.counts.nodes+"</b> nodes, <b>"+d.counts.edges+"</b> links. Dots are genes, diseases and drugs; lines are real biological links. Double-click any dot to grow it.",
         {label:"Ask if two things are linked",sel:"#hypsec",focus:"#hypA"});}
@@ -951,7 +968,7 @@ function coachReact(url,d){
     var args=arguments, p=_f.apply(this,args);
     try{
       var url=(typeof args[0]==='string')?args[0]:((args[0]&&args[0].url)||'');
-      if(coachOn()&&/\/api\/(kg\/(subgraph|hypothesis|predict)|vcell\/cell|sources\/|jobs\/)/.test(url)){
+      if(coachOn()&&/\/api\/(kg\/(subgraph|hypothesis|predict)|vcell\/cell|sources\/|jobs\/|company\/runs\/)/.test(url)){
         p.then(function(r){r.clone().json().then(function(d){coachReact(url,d);}).catch(function(){});}).catch(function(){});
       }
     }catch(e){}
@@ -960,6 +977,39 @@ function coachReact(url,d){
   renderCoachBtn();
   if(coachOn())setTimeout(coachHello,600);
 })();
+
+</script>
+<script>
+
+/* ---- Repurposing panel: run the Discovery Programs repurposing playbooks ---- */
+const REP_MAP={
+  disease:{pb:"disease_repurposing",key:"disease",ph:"rheumatoid arthritis, type 2 diabetes, lung cancer"},
+  viral:{pb:"antiviral_repurposing",key:"virus",ph:"sars-cov-2, influenza, rsv, rhinovirus"},
+  bacterial:{pb:"antibacterial_repurposing",key:"bacterium",ph:"m. tuberculosis, s. aureus, p. aeruginosa, e. coli"}
+};
+function repMode(){var m=REP_MAP[$("repMode").value];if(m)$("repName").placeholder=m.ph;}
+async function runRep(){
+  var m=REP_MAP[$("repMode").value], name=$("repName").value.trim(); if(!name)return;
+  $("repOut").textContent="Running "+m.pb+" … (ChEMBL lookups take ~15–40s)";
+  try{
+    var r=await api("/api/company/run/"+m.pb,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({params:{[m.key]:name}})});
+    repWatch(r.run_id);
+  }catch(e){$("repOut").textContent=e.message;}
+}
+async function repWatch(id){
+  try{
+    var r=await api("/api/company/runs/"+id);
+    if(r.status==="done"&&r.report){
+      $("repOut").textContent=await (await fetch("/api/company/reports/"+encodeURIComponent(r.report))).text();
+    }else if(r.status==="error"){
+      $("repOut").textContent="Error: "+((r.summary&&r.summary.error)||"failed");
+    }else{
+      $("repOut").textContent=(r.log||"Working…");
+      setTimeout(function(){repWatch(id);},2000);
+    }
+  }catch(e){$("repOut").textContent=e.message;}
+}
+repMode();
 
 </script>
 <script>function toggleTheme(){var h=document.documentElement;var n=h.getAttribute("data-theme")==="dark"?"light":"dark";h.setAttribute("data-theme",n);try{localStorage.setItem("ddd-theme",n);}catch(e){}paintThemeBtn();}function paintThemeBtn(){var b=document.getElementById("themeBtn");if(b)b.textContent=document.documentElement.getAttribute("data-theme")==="dark"?"\u2600 Light":"\u263e Dark";}paintThemeBtn();</script>
