@@ -215,6 +215,16 @@ td.num{text-align:right;font-variant-numeric:tabular-nums;font-weight:500}
 pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:11px;overflow:auto;max-height:340px;font-size:12px;margin:12px 0 0;line-height:1.5}
 .jobs div{font-size:13px;padding:4px 0;border-bottom:1px solid var(--line)}
 
+.tour-start{border:1px solid color-mix(in srgb,var(--accent) 40%,var(--line));background:var(--accent-soft);color:var(--accent);border-radius:7px;padding:5px 11px;font:600 12px "Hanken Grotesk",sans-serif;cursor:pointer;white-space:nowrap}
+.tour-start:hover{border-color:var(--accent)}
+.tour-spot{position:relative;z-index:9999;border-radius:12px;box-shadow:0 0 0 3px var(--accent),0 0 0 100vmax rgba(8,13,22,.55);scroll-margin-top:86px;transition:box-shadow .2s}
+#tourCard{position:fixed;right:24px;bottom:24px;z-index:10000;max-width:330px;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 14px 44px rgba(8,16,34,.3);padding:16px 18px;color:var(--ink)}
+#tourCard h4{font-family:"Space Grotesk",sans-serif;margin:0 0 6px;font-size:16px;font-weight:600}
+#tourCard p{margin:0 0 13px;color:var(--muted);font-size:13.5px;line-height:1.5}
+#tourCard .nav{display:flex;align-items:center;gap:7px}
+#tourCard .count{font-size:11px;color:var(--muted);margin-right:auto;font-family:"JetBrains Mono",monospace}
+@media(max-width:560px){#tourCard{left:16px;right:16px;bottom:16px;max-width:none}}
+
 </style>
 <script>(function(){try{var t=localStorage.getItem("ddd-theme")||"light";document.documentElement.setAttribute("data-theme",t);}catch(e){document.documentElement.setAttribute("data-theme","light");}})();</script>
 </head>
@@ -224,6 +234,7 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:
   <h1><span>ddd</span> Lab</h1>
   <p class="sub">Hands-on tools behind the departments: benchmarks, molecule tools, the Tools Armory and the knowledge graph.</p>
   <div class="pills" id="pills"></div>
+  <button class="tour-start" onclick="startTour()">Take the tour</button>
   <button class="theme-btn" id="themeBtn" onclick="toggleTheme()" aria-label="Switch between light and dark"></button>
 </header>
 <main>
@@ -793,6 +804,45 @@ function startCell(){
   const mo=document.getElementById("cellMotion"); if(mo) mo.addEventListener("change",startCell);
   window.addEventListener("resize",()=>{ if(cellData) drawCell(); });
 })();
+
+</script>
+<script>
+
+/* ---- in-app guided tour (shared by HQ + Lab) ---- */
+const TOUR=[
+ {page:'hq', sel:'.brand', title:'Welcome to the company', body:'This is HQ — the lobby of a drug-discovery company that runs itself. No human staff; six software agents do the work. Take 90 seconds to see it.'},
+ {page:'hq', sel:'#kpis', title:'The live numbers', body:'How much the company knows (its knowledge graph) and what it has been doing lately. These update as it works.'},
+ {page:'hq', sel:'#depts', title:'Six agent departments', body:'Each card is an agent with a job — Intelligence, Target Biology, Chemistry and so on. Each can run "playbooks" on request or on a schedule. Next, we go to the Lab where you can try things.'},
+ {page:'lab', sel:'#kgsec', title:'What the company knows', body:'The knowledge graph. Type a disease, gene or drug and press Visualize — a living web of real biological links. Double-click any dot to grow it.'},
+ {page:'lab', sel:'#hypsec', title:'Ask it questions', body:'Check whether two things are linked and how believable it is — or ask for NOVEL targets the graph implies but was never told. Fresh, testable hypotheses.'},
+ {page:'lab', sel:'#cellsec', title:'See it as a living cell', body:'Type a disease and Build cell: its target proteins appear in their real compartments — nucleus, membrane, and so on — and move.'},
+ {page:'lab', sel:'#company', title:'Run a full program', body:'Give it a disease and the agents rank targets, screen molecules and write a report, end to end.'},
+ {page:'lab', sel:'#armory', title:'Go deeper: dock & recon', body:'Dock a molecule against a target’s 3-D shape for a binding score, or map what rival drug-discovery sites expose. That’s the tour — explore freely from here.'},
+];
+const TPAGE = location.pathname.replace(/\/+$/,'')==='/lab' ? 'lab' : 'hq';
+function _tsave(s){try{localStorage.setItem('ddd_tour',JSON.stringify(s));}catch(e){}}
+function _tload(){try{return JSON.parse(localStorage.getItem('ddd_tour')||'null');}catch(e){return null;}}
+function tourClear(){try{localStorage.removeItem('ddd_tour');}catch(e){} _tremove();}
+function _tremove(){document.querySelectorAll('.tour-spot').forEach(e=>e.classList.remove('tour-spot'));var c=document.getElementById('tourCard');if(c)c.remove();}
+function startTour(){tourGo(0);}
+function tourGo(i){
+  if(i<0){i=0;}
+  if(i>=TOUR.length){tourClear();return;}
+  var step=TOUR[i];
+  if(step.page!==TPAGE){_tsave({active:true,i:i});location.href=step.page==='lab'?'/lab':'/';return;}
+  _tsave({active:true,i:i});
+  _tremove();
+  var el=document.querySelector(step.sel);
+  if(!el){return tourGo(i+1);}
+  el.classList.add('tour-spot');
+  el.scrollIntoView({behavior:'smooth',block:'start'});
+  var c=document.createElement('div');c.id='tourCard';
+  var back=i>0?'<button class="ghost small" onclick="tourGo('+(i-1)+')">Back</button>':'';
+  var nextLabel=i===TOUR.length-1?'Finish':'Next →';
+  c.innerHTML='<h4>'+step.title+'</h4><p>'+step.body+'</p><div class="nav"><span class="count">'+(i+1)+' / '+TOUR.length+'</span>'+back+'<button class="small" onclick="tourGo('+(i+1)+')">'+nextLabel+'</button><button class="link small" onclick="tourClear()">Close</button></div>';
+  document.body.appendChild(c);
+}
+(function(){var s=_tload();if(s&&s.active){setTimeout(function(){tourGo(s.i);},350);}})();
 
 </script>
 <script>function toggleTheme(){var h=document.documentElement;var n=h.getAttribute("data-theme")==="dark"?"light":"dark";h.setAttribute("data-theme",n);try{localStorage.setItem("ddd-theme",n);}catch(e){}paintThemeBtn();}function paintThemeBtn(){var b=document.getElementById("themeBtn");if(b)b.textContent=document.documentElement.getAttribute("data-theme")==="dark"?"\u2600 Light":"\u263e Dark";}paintThemeBtn();</script>
