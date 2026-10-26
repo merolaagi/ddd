@@ -240,6 +240,21 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:
 #coachPanel .k{font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--accent)}
 @media(max-width:560px){#coachPanel{left:16px;right:16px;bottom:16px;width:auto}}
 
+.tk-row{cursor:pointer}
+.tk-row:hover{background:var(--accent-soft)}
+#taskBack{position:fixed;inset:0;background:rgba(8,13,22,.5);z-index:10001;display:none}
+#taskBack.on{display:block}
+#taskModal{position:fixed;z-index:10002;left:50%;top:50%;transform:translate(-50%,-50%);width:min(560px,92vw);max-height:84vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:0 20px 60px rgba(8,16,34,.4);padding:20px 22px;display:none}
+#taskModal.on{display:block}
+#taskModal h3{font-family:"Space Grotesk",sans-serif;font-size:18px;margin:0 0 4px}
+#taskModal .x{position:absolute;top:12px;right:14px;background:none;border:0;color:var(--muted);cursor:pointer;font-size:20px;line-height:1}
+.tk-meta{color:var(--muted);font-size:12.5px;margin:0 0 10px}
+.tk-cav{background:var(--warn-soft);color:var(--warn);font-size:12px;padding:7px 10px;border-radius:7px;margin:8px 0}
+.tk-sec{margin-top:16px}
+.tk-sec h4{font-size:12px;color:var(--accent);font-weight:600;margin:0 0 7px}
+#taskModal table{width:100%;border-collapse:collapse;font-size:13px}
+#taskModal th,#taskModal td{text-align:left;padding:5px 7px;border-bottom:1px solid var(--line)}
+
 </style>
 <script>(function(){try{var t=localStorage.getItem("ddd-theme")||"light";document.documentElement.setAttribute("data-theme",t);}catch(e){document.documentElement.setAttribute("data-theme","light");}})();</script>
 </head>
@@ -412,11 +427,13 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:
     <div class="scroll"><table id="tasks"></table></div>
   </section>
 </main>
+<div id="taskBack" onclick="closeTask()"></div><div id="taskModal"></div>
 <script>
 const $ = id => document.getElementById(id);
 const api = async (p, o) => { const r = await fetch(p, o); const j = await r.json().catch(()=>({})); if(!r.ok) throw new Error(j.detail || r.status); return j; };
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 let TASKS = [];
+let MODELS = [];
 
 async function init(){
   const [info, tasks, models] = await Promise.all([api("/api/info"), api("/api/tasks"), api("/api/models")]);
@@ -429,9 +446,9 @@ async function init(){
     `<span class="pill ${info.rea.available?'ok':'off'}">REA ${info.rea.available?'ready':'needs Node 22+'}</span>` +
     `<span class="pill ${models.some(m=>m.startsWith('ollama:'))?'ok':'off'}">Ollama ${models.filter(m=>m.startsWith('ollama:')).length} models</span>`;
   $("task").innerHTML = tasks.map(t => `<option value="${t.id}" ${t.available?'':'disabled'}>${esc(t.id)} — ${esc(t.name)}</option>`).join("");
-  $("model").innerHTML = models.map(m => `<option>${esc(m)}</option>`).join("");
+  MODELS = models; $("model").innerHTML = models.map(m => `<option>${esc(m)}</option>`).join("");
   $("tasks").innerHTML = `<tr><th>Task</th><th>Phase</th><th>Metric</th></tr>` + tasks.map(t =>
-    `<tr><td><b>${esc(t.id)}</b> <span class="tag">${esc(t.source||'')}</span> <span class="tag">${t.split}</span>${t.cached?'':' <span class="tag">not downloaded</span>'}<br><span class="muted">${esc(t.name)}</span><div class="caveat">${esc(t.caveat)}</div></td><td><span class="muted" style="font-size:12px">${esc(t.category||t.domain)}</span><br>${esc(t.phase||'—')}</td><td class="mono nowrap">${t.primary_metric} ${t.higher_is_better?'↑':'↓'}</td></tr>`).join("");
+    `<tr class="tk-row" onclick="openTaskPanel('${t.id}')"><td><b>${esc(t.id)}</b> <span class="tag">${esc(t.source||'')}</span> <span class="tag">${t.split}</span>${t.cached?'':' <span class="tag">not downloaded</span>'}<br><span class="muted">${esc(t.name)}</span><div class="caveat">${esc(t.caveat)}</div></td><td><span class="muted" style="font-size:12px">${esc(t.category||t.domain)}</span><br>${esc(t.phase||'—')}</td><td class="mono nowrap">${t.primary_metric} ${t.higher_is_better?'↑':'↓'}</td></tr>`).join("");
   loadBoard(); pollJobs();
 }
 
@@ -441,7 +458,7 @@ async function loadBoard(){
   if(!ids.length){ $("board").innerHTML = `<p class="muted">No runs yet.</p>`; return; }
   $("board").innerHTML = ids.map(id => {
     const t = TASKS.find(x => x.id === id) || {};
-    return `<h3>${esc(id)} <span class="muted" style="font-weight:400">· ${esc(t.name||'')} · ${t.primary_metric||''} ${t.higher_is_better?'↑':'↓'}</span></h3>
+    return `<h3 class="tk-row" style="cursor:pointer" onclick="openTaskPanel('${id}')">${esc(id)} <span class="muted" style="font-weight:400">· ${esc(t.name||'')} · ${t.primary_metric||''} ${t.higher_is_better?'↑':'↓'}</span></h3>
     <table><colgroup><col class="c1"><col class="c2"><col class="c3"><col class="c4"><col></colgroup><tr><th>#</th><th>Model</th><th style="text-align:right">Score</th><th style="text-align:right">n test</th><th>Notes</th></tr>` +
     b[id].map((r,i) => `<tr><td>${i+1}</td><td class="mono">${esc(r.model)}</td><td class="num">${r.score==null?'—':r.score.toFixed(4)}</td><td class="num">${r.n_test}</td><td class="muted">${esc(r.extra.note||'')}${r.extra.auprc!=null?' AUPRC '+r.extra.auprc:''}${r.extra.r2!=null?' R² '+r.extra.r2:''}</td></tr>`).join("") + `</table>`;
   }).join("");
@@ -1010,6 +1027,64 @@ async function repWatch(id){
   }catch(e){$("repOut").textContent=e.message;}
 }
 repMode();
+
+</script>
+<script>
+
+/* ---- Clickable benchmark: task/leaderboard -> make a model, see progress, feasibility ---- */
+function closeTask(){var b=document.getElementById("taskBack"),m=document.getElementById("taskModal");if(b)b.classList.remove("on");if(m)m.classList.remove("on");}
+function openTaskPanel(id){var t=(TASKS||[]).find(function(x){return x.id===id;});if(!t)return;document.getElementById("taskBack").classList.add("on");document.getElementById("taskModal").classList.add("on");renderTaskModal(t);}
+async function renderTaskModal(t, extra){
+  var m=document.getElementById("taskModal");
+  var board={}, jobs=[];
+  try{board=await api("/api/leaderboard");}catch(e){}
+  try{jobs=await api("/api/jobs");}catch(e){}
+  var rows=board[t.id]||[];
+  var running=jobs.filter(function(j){return j.task===t.id&&(j.status==="running"||j.status==="queued");});
+  var models=rows.length?('<table><tr><th>Model</th><th style="text-align:right">Score</th><th style="text-align:right">n</th></tr>'+
+    rows.map(function(r){return '<tr><td class="mono">'+esc(r.model)+'</td><td class="num">'+(r.score==null?"—":r.score.toFixed(4))+'</td><td class="num">'+r.n_test+'</td></tr>';}).join("")+'</table>')
+    :'<p class="muted" style="font-size:13px">No model made for this task yet.</p>';
+  if(running.length) models+='<p class="muted" style="font-size:12.5px;margin-top:6px">Model being made now: '+running.map(function(j){return esc(j.model)+" — "+esc(j.status)+(j.progress?(" "+esc(j.progress)):"");}).join(", ")+'</p>';
+  var opts=(window.MODELS||["rf","logreg"]).map(function(x){return '<option>'+esc(x)+'</option>';}).join("");
+  m.innerHTML='<button class="x" onclick="closeTask()">×</button>'+
+    '<h3>'+esc(t.id)+'</h3>'+
+    '<p class="tk-meta">'+esc(t.name||"")+' &middot; '+esc(t.phase||t.category||"")+' &middot; '+esc(t.primary_metric||"")+' '+(t.higher_is_better?"↑":"↓")+' &middot; data '+(t.cached?"ready":(t.available?"downloads on first run":"needs download"))+'</p>'+
+    (t.caveat?'<div class="tk-cav">'+esc(t.caveat)+'</div>':'')+
+    '<div class="tk-sec"><h4>Models made</h4>'+models+'</div>'+
+    '<div class="tk-sec"><h4>Do something about it</h4>'+
+      '<div class="row"><select id="tkModel" style="flex:0;min-width:120px">'+opts+'</select>'+
+      '<button onclick="makeTaskModel(\''+t.id+'\')">Make the model</button>'+
+      '<button class="ghost" onclick="taskCanvas(\''+t.id+'\')">Can it be made?</button></div>'+
+      '<div id="tkOut" style="font-size:13px;margin-top:12px;line-height:1.5">'+(extra||'<span class="muted">Make the baseline now, or check feasibility for a stronger model.</span>')+'</div></div>';
+}
+async function makeTaskModel(id){
+  var model=document.getElementById("tkModel").value;
+  document.getElementById("tkOut").innerHTML="Making <b>"+esc(model)+"</b> for <b>"+esc(id)+"</b>… (trains on first use)";
+  try{
+    await api("/api/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({task:id,model:model})});
+    pollTaskJob(id);
+  }catch(e){document.getElementById("tkOut").textContent=e.message;}
+}
+async function pollTaskJob(id){
+  var jobs=[]; try{jobs=await api("/api/jobs");}catch(e){}
+  var mine=jobs.filter(function(j){return j.task===id;}).slice(-1)[0];
+  if(mine&&mine.status==="done"&&mine.result){
+    renderTaskModal((TASKS||[]).find(function(x){return x.id===id;}),
+      "<b>Model made:</b> "+esc(mine.result.metric)+" "+mine.result.score+" ("+mine.result.seconds+"s). This model now also scores the property when triaging candidates.");
+    loadBoard();
+  }else if(mine&&mine.status==="error"){ document.getElementById("tkOut").textContent="Error: "+esc(mine.error); }
+  else { document.getElementById("tkOut").innerHTML='<span class="muted">Training… the model is being made.</span>'; setTimeout(function(){pollTaskJob(id);},1500); }
+}
+function taskCanvas(id){
+  var t=(TASKS||[]).find(function(x){return x.id===id;}); if(!t)return;
+  document.getElementById("tkOut").innerHTML=
+    "<b>Can a model be made? Yes.</b><br>"+
+    "&bull; Baseline (rf / logreg) trains now on CPU — no GPU needed.<br>"+
+    "&bull; Data: "+(t.cached?"ready locally":(t.available?"fetches from the public source on first run":"needs download"))+".<br>"+
+    "&bull; Target: "+esc(t.primary_metric||"")+" in "+esc(t.category||t.domain||"")+" ("+esc(t.phase||"")+").<br>"+
+    "&bull; A stronger learned model (fingerprint MLP / GNN) is feasible on CPU at this dataset size; a custom architecture can be drawn on a model canvas (your DNN Designer) and its scores brought back here.<br>"+
+    '<button style="margin-top:8px" onclick="makeTaskModel(\''+id+'\')">Make the baseline now</button>';
+}
 
 </script>
 <script>function toggleTheme(){var h=document.documentElement;var n=h.getAttribute("data-theme")==="dark"?"light":"dark";h.setAttribute("data-theme",n);try{localStorage.setItem("ddd-theme",n);}catch(e){}paintThemeBtn();}function paintThemeBtn(){var b=document.getElementById("themeBtn");if(b)b.textContent=document.documentElement.getAttribute("data-theme")==="dark"?"\u2600 Light":"\u263e Dark";}paintThemeBtn();</script>
