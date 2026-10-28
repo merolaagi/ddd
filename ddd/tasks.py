@@ -154,6 +154,49 @@ def _cache_path(task: Task):
     return DATA_DIR / f"{task.id}.csv"
 
 
+_SMILES_ALTS = ["drug", "smiles", "canonical_smiles", "x", "mol", "structure", "drug_smiles"]
+_LABEL_ALTS = ["y", "label", "target", "value", "activity"]
+_SMILES_CHARS = set("()[]=#@+-.\\/1234567890")
+
+
+def _looks_smiles(series) -> bool:
+    vals = [str(v) for v in series.dropna().head(20)]
+    if not vals:
+        return False
+    hits = sum(1 for v in vals if len(v) >= 3 and any(c.isalpha() for c in v)
+               and any(c in _SMILES_CHARS for c in v))
+    return hits >= max(1, len(vals) // 2)
+
+
+def _resolve_cols(df: "pd.DataFrame", task: Task):
+    """Find the SMILES and label columns tolerantly: declared names, then common
+    alternatives, then a heuristic (SMILES-looking column; last numeric column)."""
+    cols = {c.lower(): c for c in df.columns}
+
+    def pick(declared, alts):
+        if declared and declared.lower() in cols:
+            return cols[declared.lower()]
+        for a in alts:
+            if a in cols:
+                return cols[a]
+        return None
+
+    sc = pick(task.smiles_col, _SMILES_ALTS)
+    if sc is None:
+        for c in df.columns:
+            if _looks_smiles(df[c]):
+                sc = c
+                break
+    lc = pick(task.label_col, _LABEL_ALTS)
+    if lc is None:
+        num = [c for c in df.columns if c != sc and pd.api.types.is_numeric_dtype(df[c])]
+        lc = num[-1] if num else None
+    if sc is None or lc is None:
+        raise ValueError(f"{task.id}: couldn't find smiles/label columns in {list(df.columns)} "
+                         f"(wanted {task.smiles_col!r}/{task.label_col!r})")
+    return sc, lc
+
+
 def load_frame(task: Task) -> pd.DataFrame:
     """Return DataFrame with columns smiles, y."""
     p = _cache_path(task)
@@ -166,9 +209,7 @@ def load_frame(task: Task) -> pd.DataFrame:
         if task.url.endswith(".gz"):
             raw = gzip.decompress(raw)
         df = pd.read_csv(io.BytesIO(raw), sep=task.sep)
-        cols = {c.lower(): c for c in df.columns}
-        sc = cols.get(task.smiles_col.lower(), task.smiles_col)
-        lc = cols.get(task.label_col.lower(), task.label_col)
+        sc, lc = _resolve_cols(df, task)
         df = df[[sc, lc]].rename(columns={sc: "smiles", lc: "y"})
         df = df.dropna().drop_duplicates("smiles")
         df.to_csv(p, index=False)
