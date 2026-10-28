@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ask ddd</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Hanken+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f1f4f8; --panel:#fff; --ink:#15223b; --muted:#5e6b80; --line:#e1e7ef;
+  --accent:#2b4acb; --accent-strong:#213ba6; --accent-soft:#e7ecfb; --ok:#1c9a6a; --ok-soft:#e2f4ec;
+  --warn:#b06a0c; --warn-soft:#faedd7; --bad:#c23a2b; --user:#eef1f6;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0b1220; --panel:#111b2e; --ink:#e7edf6; --muted:#93a1b5; --line:#223049;
+  --accent:#8197ff; --accent-strong:#9aadff; --accent-soft:#1a2544; --ok:#43c08d; --ok-soft:#142a22;
+  --warn:#e0a648; --warn-soft:#2c2413; --bad:#e27a6e; --user:#18233b;}}
+:root[data-theme="dark"]{
+  --bg:#0b1220; --panel:#111b2e; --ink:#e7edf6; --muted:#93a1b5; --line:#223049;
+  --accent:#8197ff; --accent-strong:#9aadff; --accent-soft:#1a2544; --ok:#43c08d; --ok-soft:#142a22;
+  --warn:#e0a648; --warn-soft:#2c2413; --bad:#e27a6e; --user:#18233b;}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 "Hanken Grotesk",system-ui,sans-serif;-webkit-font-smoothing:antialiased;display:flex;flex-direction:column;height:100vh}
+a{color:var(--accent)}
+header{display:flex;align-items:center;gap:14px;padding:12px 20px;border-bottom:1px solid var(--line);background:var(--panel)}
+.brand{font-family:"Space Grotesk",sans-serif;font-weight:700;font-size:18px;letter-spacing:-.01em}
+.brand b{color:var(--accent)}
+header nav{display:flex;gap:2px;margin-left:8px}
+header nav a{color:var(--muted);text-decoration:none;font-size:14px;padding:6px 10px;border-radius:8px;font-weight:500}
+header nav a:hover{color:var(--ink)}
+.spacer{margin-left:auto}
+.tbtn{border:1px solid var(--line);background:var(--panel);color:var(--muted);border-radius:8px;padding:6px 12px;font:500 12px "Hanken Grotesk",sans-serif;cursor:pointer}
+.tbtn:hover{border-color:var(--accent);color:var(--accent)}
+
+.scroll{flex:1;overflow-y:auto}
+.col{max-width:760px;margin:0 auto;padding:26px 20px 40px}
+
+/* empty state */
+.hero{min-height:calc(100vh - 230px);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:10px}
+.hero .mark{font-family:"Space Grotesk",sans-serif;font-weight:700;font-size:30px;letter-spacing:-.02em}
+.hero .mark b{color:var(--accent)}
+.hero h1{font-family:"Space Grotesk",sans-serif;font-weight:500;font-size:24px;letter-spacing:-.01em;margin:4px 0 2px}
+.hero p{color:var(--muted);margin:0 0 14px;max-width:46ch}
+.chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;max-width:620px}
+.chip{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:999px;padding:8px 14px;font-size:13.5px;cursor:pointer;transition:border-color .12s}
+.chip:hover{border-color:var(--accent);color:var(--accent)}
+
+/* turns */
+.turn{display:flex;gap:12px;margin:22px 0}
+.turn.user{justify-content:flex-end}
+.turn.user .bubble{background:var(--user);border:1px solid var(--line);border-radius:16px 16px 4px 16px;padding:11px 15px;max-width:82%;font-size:15.5px}
+.turn.bot .av{width:28px;height:28px;border-radius:8px;background:var(--accent);color:#fff;font-family:"Space Grotesk",sans-serif;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;flex:0 0 auto;margin-top:2px}
+.turn.bot .body{min-width:0;flex:1;font-size:15.5px}
+.turn.bot .body>p:first-child{margin-top:3px}
+.body b{color:var(--ink)}
+
+/* plan / options / results */
+.plan{margin:11px 0;border:1px solid var(--line);border-radius:11px;overflow:hidden;background:var(--panel)}
+.plan-h{font:600 10.5px "JetBrains Mono",monospace;color:var(--accent);padding:6px 13px;border-bottom:1px solid var(--line);letter-spacing:.04em}
+.plan-s{display:flex;gap:10px;align-items:center;padding:7px 13px;font-size:13px;color:var(--muted);border-bottom:1px solid var(--line)}
+.plan-s:last-child{border-bottom:0}
+.plan-s .n{width:19px;height:19px;border-radius:6px;background:var(--accent-soft);color:var(--accent);font:600 11px "Space Grotesk",sans-serif;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+.opts{display:flex;flex-wrap:wrap;gap:8px;margin-top:11px}
+.opt{border:1px solid color-mix(in srgb,var(--accent) 40%,var(--line));background:var(--accent-soft);color:var(--accent);border-radius:10px;padding:8px 15px;font:600 14px "Hanken Grotesk",sans-serif;cursor:pointer}
+.opt:hover{background:var(--accent);color:#fff}
+.lit{margin-top:10px}
+.lit .p{padding:8px 0;border-bottom:1px solid var(--line)}
+.lit .p a{font-weight:600;text-decoration:none}
+.lit .p .m{color:var(--muted);font-size:12.5px;margin-top:2px}
+.rtab{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px}
+.rtab th,.rtab td{border-bottom:1px solid var(--line);padding:5px 9px;text-align:left}
+.rtab th{color:var(--muted);font-weight:600;font-size:12px}
+
+/* rendered report markdown */
+.md{font-size:14.5px;line-height:1.6}
+.md h1{font-family:"Space Grotesk",sans-serif;font-size:19px;font-weight:600;margin:4px 0 8px}
+.md h2{font-family:"Space Grotesk",sans-serif;font-size:15px;font-weight:600;margin:18px 0 6px}
+.md table{border-collapse:collapse;font-size:12.5px;display:block;overflow-x:auto;margin:8px 0}
+.md td,.md th{border:1px solid var(--line);padding:4px 8px}
+.md th{background:var(--bg);color:var(--muted)}
+.md code{background:var(--accent-soft);color:var(--accent);padding:1px 5px;border-radius:4px;font-size:12px}
+.md pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;overflow:auto;font-size:12px}
+.md ul{margin:6px 0;padding-left:20px}
+.md hr{border:0;border-top:1px solid var(--line);margin:12px 0}
+.muted{color:var(--muted)} .err{color:var(--bad)}
+.runout{margin-top:6px}
+.dots::after{content:"";animation:dots 1.4s steps(4,end) infinite}
+@keyframes dots{0%{content:""}25%{content:"·"}50%{content:"··"}75%{content:"···"}}
+
+/* composer */
+.composer{border-top:1px solid var(--line);background:var(--panel)}
+.composer .wrap{max-width:760px;margin:0 auto;padding:14px 20px 18px}
+.inbox{display:flex;align-items:flex-end;gap:10px;border:1px solid var(--line);border-radius:16px;background:var(--bg);padding:9px 10px 9px 15px;box-shadow:0 2px 10px rgba(8,16,34,.04)}
+.inbox:focus-within{border-color:var(--accent)}
+#q{flex:1;border:0;background:transparent;color:var(--ink);font:15.5px/1.5 "Hanken Grotesk",sans-serif;resize:none;max-height:180px;outline:none;padding:5px 0}
+.send{width:36px;height:36px;border-radius:10px;border:0;background:var(--accent);color:#fff;font-size:17px;cursor:pointer;flex:0 0 auto}
+.send:hover{background:var(--accent-strong)}
+.send:disabled{opacity:.4;cursor:default}
+.foot{color:var(--muted);font-size:11.5px;text-align:center;margin-top:9px}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><b>ddd</b> · Ask</div>
+  <nav><a href="/">HQ</a><a href="/lab">Lab</a></nav>
+  <div class="spacer"></div>
+  <button class="tbtn" id="tb" onclick="tt()">☾ Dark</button>
+</header>
+
+<div class="scroll" id="scroll">
+  <div class="col" id="col">
+    <div class="hero" id="hero">
+      <div class="mark"><b>ddd</b></div>
+      <h1>What should the company look into?</h1>
+      <p>Ask in plain language. I'll plan it, ask if I need to, run the right analysis across the company, and interpret the result.</p>
+      <div class="chips" id="chips"></div>
+    </div>
+  </div>
+</div>
+
+<div class="composer"><div class="wrap">
+  <div class="inbox">
+    <textarea id="q" rows="1" placeholder="Ask ddd anything…" oninput="grow()" onkeydown="keyd(event)"></textarea>
+    <button class="send" id="send" onclick="go()" aria-label="Send">↑</button>
+  </div>
+  <div class="foot">ddd runs on this Mac · predictions are research signals, not clinical advice.</div>
+</div></div>
+
+<script>
+(function(){try{var t=localStorage.getItem('ddd-theme')||'light';document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','light');}})();
+function tt(){var h=document.documentElement,n=h.getAttribute('data-theme')==='dark'?'light':'dark';h.setAttribute('data-theme',n);try{localStorage.setItem('ddd-theme',n);}catch(e){}ptb();}
+function ptb(){var b=document.getElementById('tb');if(b)b.textContent=document.documentElement.getAttribute('data-theme')==='dark'?'☀ Light':'☾ Dark';}ptb();
+
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const api=async(p,o)=>{const r=await fetch(p,o);const ct=r.headers.get("content-type")||"";const b=ct.includes("json")?await r.json():await r.text();if(!r.ok)throw new Error((b&&b.detail)||r.status);return b;};
+function mdInline(t){let h=esc(t);h=h.replace(/`([^`]+)`/g,"<code>$1</code>");h=h.replace(/\*\*([^*]+)\*\*/g,"<b>$1</b>");return h;}
+function mdToHtml(md){const L=md.split("\n"),out=[];for(let i=0;i<L.length;i++){const line=L[i];
+  if(line.startsWith("```")){const buf=[];i++;while(i<L.length&&!L[i].startsWith("```"))buf.push(L[i++]);out.push("<pre>"+esc(buf.join("\n"))+"</pre>");continue;}
+  const hh=line.match(/^(#{1,4})\s+(.*)$/);if(hh){const n=Math.min(hh[1].length,2);out.push("<h"+n+">"+mdInline(hh[2])+"</h"+n+">");continue;}
+  if(/^\s*\|.*\|\s*$/.test(line)){const rows=[];while(i<L.length&&/^\s*\|.*\|\s*$/.test(L[i]))rows.push(L[i++]);i--;const cells=r=>r.trim().replace(/^\||\|$/g,"").split("|").map(c=>c.trim());const body=rows.filter(r=>!/^\s*\|[\s:|-]+\|\s*$/.test(r));out.push("<table>"+body.map((r,k)=>"<tr>"+cells(r).map(c=>k===0?"<th>"+mdInline(c)+"</th>":"<td>"+mdInline(c)+"</td>").join("")+"</tr>").join("")+"</table>");continue;}
+  if(/^\s*[-*]\s+/.test(line)){const items=[];while(i<L.length&&/^\s*[-*]\s+/.test(L[i])){items.push("<li>"+mdInline(L[i].replace(/^\s*[-*]\s+/,""))+"</li>");i++;}i--;out.push("<ul>"+items.join("")+"</ul>");continue;}
+  if(/^---+\s*$/.test(line)){out.push("<hr>");continue;}
+  if(line.trim())out.push("<p>"+mdInline(line)+"</p>");}
+  return out.join("\n");}
+
+const SUGG=["Repurposing candidates for rheumatoid arthritis","Program plan for LAMA2 muscular dystrophy","Is TERT linked to idiopathic pulmonary fibrosis?","Novel targets for lung cancer","What's known about TMPRSS2","Build a cell for psoriasis"];
+document.getElementById("chips").innerHTML=SUGG.map(s=>'<button class="chip" onclick="go(this.textContent)">'+esc(s)+'</button>').join("");
+
+const col=document.getElementById("col"),scroll=document.getElementById("scroll");
+let LAST_CLARIFY=null, busy=false;
+function toBottom(){scroll.scrollTop=scroll.scrollHeight;}
+function dropHero(){var h=document.getElementById("hero");if(h)h.remove();}
+function addTurn(who,html){dropHero();var d=document.createElement("div");d.className="turn "+who;
+  d.innerHTML = who==="user" ? '<div class="bubble">'+html+'</div>' : '<div class="av">d</div><div class="body">'+html+'</div>';
+  col.appendChild(d);toBottom();return d;}
+function grow(){var q=document.getElementById("q");q.style.height="auto";q.style.height=Math.min(q.scrollHeight,180)+"px";}
+function keyd(e){if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();go();}}
+
+async function go(preset){
+  if(busy)return;
+  var q=preset||document.getElementById("q").value.trim();if(!q)return;
+  document.getElementById("q").value="";grow();
+  addTurn("user",esc(q));
+  busy=true;document.getElementById("send").disabled=true;
+  var bot=addTurn("bot",'<span class="muted dots">Thinking</span>');
+  try{var r=await api("/api/analyst",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({q:q})});render(bot,r,q);}
+  catch(e){bot.querySelector(".body").innerHTML='<span class="err">'+esc(e.message)+'</span>';}
+  busy=false;document.getElementById("send").disabled=false;document.getElementById("q").focus();
+}
+async function choose(choice){
+  var c=LAST_CLARIFY;if(!c)return;LAST_CLARIFY=null;
+  addTurn("user",esc(choice));
+  var bot=addTurn("bot",'<span class="muted dots">Working</span>');
+  try{var r=await api("/api/analyst",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({q:c.q,choice:choice,pending:c.pending})});render(bot,r,c.q);}
+  catch(e){bot.querySelector(".body").innerHTML='<span class="err">'+esc(e.message)+'</span>';}
+}
+function planHtml(p){return (p&&p.length)?'<div class="plan"><div class="plan-h">PLAN</div>'+p.map((s,i)=>'<div class="plan-s"><span class="n">'+(i+1)+'</span>'+esc(s)+'</div>').join("")+'</div>':"";}
+function render(bot,r,q){
+  var el=bot.querySelector(".body");
+  if(r.kind==="clarify"){LAST_CLARIFY={pending:r.pending,q:q};
+    el.innerHTML=mdInline(r.say)+'<div class="opts">'+r.options.map(o=>'<button class="opt" onclick="choose(\''+o.value.replace(/'/g,"\\'")+'\')">'+esc(o.label)+'</button>').join("")+'</div>';toBottom();return;}
+  if(r.kind==="answer"){el.innerHTML=mdInline(r.say);toBottom();return;}
+  if(r.kind==="ui"){el.innerHTML=mdInline(r.say)+planHtml(r.plan)+'<p class="muted" style="margin-top:8px">Open it in the <a href="/lab">Lab</a> to see the '+(r.ui.action==="cell"?"living cell":"graph")+'.</p>';toBottom();return;}
+  if(r.kind==="data"){var d=r.result.data,html=mdInline(r.say)+planHtml(r.plan);
+    if(r.result.type==="predict"){html+='<table class="rtab"><tr><th>#</th><th>Gene</th><th>AA</th><th>drugs</th></tr>'+(d.predictions||[]).slice(0,10).map((p,i)=>'<tr><td>'+(i+1)+'</td><td><b>'+esc(p.name)+'</b></td><td>'+p.adamic_adar+'</td><td>'+(p.known_drugs||0)+'</td></tr>').join("")+'</table>';}
+    else if(r.result.type==="hypothesis"){html+='<p style="margin:8px 0 0"><b>'+esc(d.plausibility)+'</b> — '+esc(d.reading)+' <span class="muted">(common '+d.scores.common_neighbors+', Adamic-Adar '+d.scores.adamic_adar+', hops '+(d.path_hops||"—")+')</span></p>';}
+    else if(r.result.type==="literature"){var ps=d.papers||[];html+='<div class="lit">'+(ps.length?ps.map(p=>'<div class="p"><a href="'+(p.url||"#")+'" target="_blank">'+esc(p.title||"untitled")+'</a><div class="m">'+esc(p.authors||"")+' · '+esc(p.journal||"")+' '+esc(p.year||"")+(p.cited!=null?(" · cited "+p.cited):"")+'</div></div>').join(""):'<span class="muted">No papers found.</span>')+'</div>';}
+    el.innerHTML=html;toBottom();return;}
+  if(r.kind==="run"){el.innerHTML=mdInline(r.say)+planHtml(r.plan)+'<div class="runout muted dots">Running</div>';watch(r.run_id,el);toBottom();return;}
+}
+async function watch(id,el){
+  try{var r=await api("/api/company/runs/"+id),out=el.querySelector(".runout");
+    if(r.status==="done"&&r.report){var txt=await (await fetch("/api/company/reports/"+encodeURIComponent(r.report))).text();out.className="runout md";out.innerHTML=mdToHtml(txt);toBottom();}
+    else if(r.status==="error"){out.className="runout err";out.textContent=(r.summary&&r.summary.error)||"failed";}
+    else{out.textContent=(r.log?r.log.trim().split("\n").slice(-1)[0]:"Running");setTimeout(()=>watch(id,el),2000);}
+  }catch(e){var o=el.querySelector(".runout");if(o){o.className="runout err";o.textContent=e.message;}}
+}
+document.getElementById("q").focus();
+</script>
+</body>
+</html>

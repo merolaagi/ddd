@@ -79,6 +79,11 @@ def lab():
     return FileResponse(STATIC / "lab.html")
 
 
+@app.get("/chat")
+def chat():
+    return FileResponse(STATIC / "chat.html")
+
+
 @app.get("/healthz")
 def healthz():
     """Unauthenticated readiness probe (serve.sh), so Basic auth on the UI
