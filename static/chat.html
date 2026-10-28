@@ -146,7 +146,7 @@ function mdToHtml(md){const L=md.split("\n"),out=[];for(let i=0;i<L.length;i++){
   if(line.trim())out.push("<p>"+mdInline(line)+"</p>");}
   return out.join("\n");}
 
-const SUGG=["Repurposing candidates for rheumatoid arthritis","Program plan for LAMA2 muscular dystrophy","Is TERT linked to idiopathic pulmonary fibrosis?","Novel targets for lung cancer","What's known about TMPRSS2","Build a cell for psoriasis"];
+const SUGG=["Design novel molecules for EGFR","Repurposing candidates for rheumatoid arthritis","Program plan for LAMA2 muscular dystrophy","Is TERT linked to idiopathic pulmonary fibrosis?","Novel targets for lung cancer","Build a cell for psoriasis"];
 document.getElementById("chips").innerHTML=SUGG.map(s=>'<button class="chip" onclick="go(this.textContent)">'+esc(s)+'</button>').join("");
 
 const col=document.getElementById("col"),scroll=document.getElementById("scroll");

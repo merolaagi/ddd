@@ -99,6 +99,17 @@ PLAYBOOKS = {p.name: p for p in [
              "Properties, six baseline predictions and red flags for up to 50 SMILES.",
              {"smiles": {"type": "text", "default": "CC(=O)Oc1ccccc1C(=O)O\nCN1CCC[C@H]1c1cccnc1"},
               "label": {"type": "str", "default": ""}}, pb.chem_molecule_triage),
+    Playbook("generative_design", "Generative design", "chem",
+             "De-novo molecule design (our Chemistry42 analog): a graph genetic algorithm evolves novel, "
+             "drug-like candidates for a target, seeded from its ChEMBL actives and scored by QED + "
+             "synthesizability + Ro5 + similarity. Reward-guided search, not validated activity.",
+             {"target": {"type": "str", "default": "EGFR"},
+              "seeds": {"type": "text", "default": ""},
+              "organism": {"type": "str", "default": ""},
+              "n": {"type": "int", "default": 12},
+              "generations": {"type": "int", "default": 20},
+              "dock": {"type": "bool", "default": False}},
+             pb.generative_design),
     Playbook("program_plan", "Program plan", "ops",
              "Turn a disease + modality into a staged experimental program: CRO task list, outreach drafts, "
              "milestones and go/no-go gates (small molecule or antibody). Grounded in ddd's target ranking.",

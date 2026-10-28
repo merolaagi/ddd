@@ -240,6 +240,26 @@ def api_literature(q: str, limit: int = 8):
         raise HTTPException(502, f"Europe PMC: {str(e)[:160]}")
 
 
+class GenerateReq(BaseModel):
+    target: str = ""
+    seeds: list[str] | None = None
+    organism: str | None = None
+    n: int = 12
+    generations: int = 20
+    dock: bool = False
+
+
+@app.post("/api/generate")
+def api_generate(req: GenerateReq):
+    from . import generate as gen
+    try:
+        return gen.generate(target=req.target, seeds=req.seeds, organism=req.organism,
+                             n=min(req.n, 30), generations=min(req.generations, 40),
+                             dock=req.dock)
+    except Exception as e:
+        raise HTTPException(500, f"generate: {str(e)[:200]}")
+
+
 @app.post("/api/analyst")
 def analyst(req: AnalystReq):
     from . import analyst as an

@@ -50,7 +50,8 @@ def _start(playbook: str, params: dict, plan: list, say: str) -> dict:
 
 HELP = ("I can: rank **targets** for a disease, find **repurposing** candidates "
         "(human disease, virus, or bacterium), check a **hypothesis** between two things, "
-        "**predict novel targets**, **build the cell**, **map the graph**, draft a **program plan**, "
+        "**predict novel targets**, **design novel molecules** for a target, **build the cell**, "
+        "**map the graph**, draft a **program plan**, "
         "or run a **benchmark**. Try: *\"repurposing candidates for rheumatoid arthritis\"* or "
         "*\"program plan for LAMA2 muscular dystrophy\"*.")
 
@@ -116,6 +117,16 @@ def handle(q: str, choice: str | None = None, pending: dict | None = None) -> di
     if re.search(r"\bdeg\b|differential expression|gene set|interpret these genes|rna-?seq", ql):
         return {"kind": "answer", "say": "Paste your gene list into the **DEG / gene-set interpretation** panel below and run it — "
                 "it maps the set onto diseases, pathways and druggable genes."}
+
+    # ---- generative design / de-novo molecules (before repurposing, which also matches "compounds for") ----
+    if re.search(r"\b(design|generate|create|invent|evolve|come up with|make me)\b.{0,30}\b(molecule|compound|ligand|drug|inhibitor|candidate|chemistry|chemical|analog\w*)s?\b", ql) \
+            or re.search(r"\b(de[- ]?novo|generative)\b.{0,20}\b(design|chemistry|molecule)", ql) \
+            or re.search(r"\bnew (molecule|compound|inhibitor|drug|ligand)s?\b", ql):
+        ent = _tail(q)
+        return _start("generative_design", {"target": ent},
+                      ["Seed from target's ChEMBL actives", "Evolve via graph genetic algorithm",
+                       "Score by QED + synthesizability + similarity", "Rank novel candidates"],
+                      f"Designing novel molecules for **{ent}**.")
 
     # ---- repurposing / "drugs for" / "treatment for" ----
     if re.search(r"\brepurpos\w+|candidate drugs?|drugs? for|treat(ment)? for|therap(y|ies) for|compounds? for|cure for\b", ql):

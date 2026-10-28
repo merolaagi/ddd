@@ -358,6 +358,16 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:
     </div>
     <pre id="repOut" class="mono" style="max-height:540px">Pick a mode, type a disease / virus / bacterium, and Run.</pre>
   </section>
+  <section class="w12" id="gensec">
+    <h2>Generative design <span class="muted" style="font-size:12px;font-weight:400">· our Chemistry42</span></h2>
+    <p class="muted" style="font-size:13px;margin:-4px 0 12px">De-novo molecule design: a graph genetic algorithm evolves novel, drug-like candidates for a target, seeded from its ChEMBL actives (or your own SMILES) and scored by QED + synthesizability + Ro5 + similarity. Reward-guided search over public chemistry — not validated activity.</p>
+    <div class="row">
+      <input id="genTarget" placeholder="target gene — EGFR, BRAF, JAK2" style="flex:0;min-width:200px">
+      <input id="genSeeds" placeholder="optional: seed SMILES (comma/newline) — overrides target">
+      <button onclick="runGen()">Design molecules</button>
+    </div>
+    <pre id="genOut" class="mono" style="max-height:540px">Type a target gene (or paste seed SMILES) and Design. ~15–40s for ChEMBL seeds, then the GA runs locally.</pre>
+  </section>
   <section class="w6" id="indexsec">
     <h2>Benchmark Index</h2>
     <p class="muted" style="font-size:13px;margin:-4px 0 10px">Open benchmarks, each with a known caveat. O3DC-style, local and extensible.</p>
@@ -1091,6 +1101,29 @@ async function repWatch(id){
   }catch(e){$("repOut").textContent=e.message;}
 }
 repMode();
+
+async function runGen(){
+  var t=$("genTarget").value.trim(), seeds=$("genSeeds").value.trim();
+  if(!t&&!seeds){$("genOut").textContent="Give a target gene or seed SMILES.";return;}
+  $("genOut").textContent="Seeding"+(t?(" from "+t):" from SMILES")+" and evolving candidates …";
+  try{
+    var r=await api("/api/company/run/generative_design",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({params:{target:t,seeds:seeds}})});
+    genWatch(r.run_id);
+  }catch(e){$("genOut").textContent=e.message;}
+}
+async function genWatch(id){
+  try{
+    var r=await api("/api/company/runs/"+id);
+    if(r.status==="done"&&r.report){
+      $("genOut").textContent=await (await fetch("/api/company/reports/"+encodeURIComponent(r.report))).text();
+    }else if(r.status==="error"){
+      $("genOut").textContent="Error: "+((r.summary&&r.summary.error)||"failed");
+    }else{
+      $("genOut").textContent=(r.log||"Working…");
+      setTimeout(function(){genWatch(id);},2000);
+    }
+  }catch(e){$("genOut").textContent=e.message;}
+}
 
 </script>
 <script>

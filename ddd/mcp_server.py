@@ -71,6 +71,22 @@ def predict_property(task: str, smiles: list[str]) -> list[dict]:
 
 
 @mcp.tool()
+def generate_molecules(target: str = "", seeds: list[str] | None = None,
+                       organism: str | None = None, n: int = 12,
+                       generations: int = 20, dock: bool = False) -> dict:
+    """De-novo molecule design (our Chemistry42 analog). A graph genetic algorithm
+    evolves novel, drug-like molecules in the neighbourhood of a target's known
+    ChEMBL actives, scored by QED + synthetic accessibility + Ro5 + similarity.
+    target: gene symbol to seed from (e.g. 'EGFR'); or pass explicit `seeds` SMILES.
+    dock=True also docks the final elite vs the target if a Vina engine is configured.
+    Returns ranked candidates with per-molecule reward components. Reward-guided search
+    over public chemistry, not validated activity."""
+    from . import generate as _gen
+    return _gen.generate(target=target, seeds=seeds, organism=organism,
+                         n=min(n, 30), generations=min(generations, 40), dock=dock)
+
+
+@mcp.tool()
 async def run_benchmark(task: str, model: str = "rf", sample: int | None = None) -> dict:
     """Train/evaluate a model on a task's held-out scaffold split and record the score.
     model: 'rf', 'logreg' or 'ollama:<name>'. sample limits LLM test molecules (default 100)."""

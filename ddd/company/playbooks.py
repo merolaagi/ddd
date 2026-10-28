@@ -312,6 +312,48 @@ def chem_molecule_triage(ctx, smiles: str | list, label: str = ""):
     return {"molecules": len(items), "flagged": flagged}, lines
 
 
+def generative_design(ctx, target: str = "", seeds: str = "", organism: str = "",
+                      n: int = 12, generations: int = 20, dock: bool = False):
+    """De-novo molecule design: evolve novel drug-like candidates for a target
+    (our Chemistry42 analog). Seeds from the target's ChEMBL actives (or supplied
+    SMILES), scored by QED + synthesizability + Ro5 + similarity."""
+    from .. import generate as gen
+    seed_list = None
+    if seeds:
+        seed_list = [s.strip() for s in str(seeds).replace(",", "\n").splitlines() if s.strip()]
+    r = gen.generate(target=target, seeds=seed_list, organism=(organism or None),
+                     n=min(int(n), 30), generations=min(int(generations), 40),
+                     dock=bool(dock), progress=ctx.log)
+    if not r.get("ok"):
+        raise ValueError(r.get("error", "generation failed"))
+    cands = r["candidates"]
+    head = f"# Generative design{' · ' + target if target else ''}"
+    lines = [head, "",
+             f"Evolved **{r['unique_explored']}** unique molecules from **{r['seeds']}** seed(s) over "
+             f"{r['generations']} generations; returning the top {len(cands)}. "
+             + "; ".join(r.get("seed_meta", [])) + ".", "",
+             "Reward-guided graph genetic algorithm over public chemistry (GB-GA style). "
+             "Novelty = distance from seeds; QED/Ro5/SA are drug-likeness and synthesizability "
+             "proxies, **not** validated activity.", ""]
+    hdr = "| # | SMILES | Formula | Score | QED | SA | Sim→seed | Ro5 viol. | MW | logP |"
+    sep = "|---|---|---|---|---|---|---|---|---|---|"
+    if r.get("docked"):
+        hdr = hdr[:-1] + " Dock kcal/mol |"
+        sep = sep + "---|"
+    lines += [hdr, sep]
+    for c in cands:
+        row = (f"| {c['rank']} | `{c['smiles']}` | {c['formula']} | {c['score']} | {c['qed']} | "
+               f"{c['sa']} | {c['sim_to_seed']} | {c['ro5_violations']} | {c['mol_weight']} | {c['logp']} |")
+        if r.get("docked"):
+            row += f" {c.get('dock_kcal_mol', '—')} |"
+        lines.append(row)
+    lines += ["", "**How to read it.** Higher *Score* = better balance of drug-likeness (QED), "
+              "synthesizability (SA, 1=easy), on-target similarity (Sim→seed), and Lipinski behaviour. "
+              "*Sim→seed* near 1.0 means close to a known active; lower means more novel scaffold. "
+              "Next step: run these through **Molecule triage** for ADMET baselines, or dock the top rows."]
+    return {"candidates": len(cands), "explored": r["unique_explored"], "target": target or None}, lines
+
+
 # ---------------------------------------------------------------- Publishing
 
 _GH_CACHE = COMPANY_DIR / "github_cache.json"
