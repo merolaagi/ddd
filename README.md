@@ -190,6 +190,16 @@ their inhibitors, triaged and ranked. Pathogens: M. tuberculosis, S. aureus,
 P. aeruginosa, E. coli. The dossier flags targets that returned no ChEMBL hits
 so the query names can be tuned.
 
+## Ask ddd (the analyst)
+
+A plain-language front door (Lab → **Ask ddd**, `ddd/analyst.py`, `/api/analyst`).
+Ask a question; the analyst works out the intent, shows a short **plan**, asks a
+**clarifying question with options** when it's ambiguous (e.g. small-molecule vs
+antibody), then runs the right capability — repurposing, target dossier,
+hypothesis, novel-target prediction, the cell, the graph, a program plan or a
+benchmark — and interprets the result inline. Rules-based routing: instant, no
+model API, orchestrating the same playbooks and graph tools as the rest of ddd.
+
 ## Knowledge graph viewer
 
 The Lab's **Knowledge graph** panel renders PrimeKG subgraphs interactively,

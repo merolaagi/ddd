@@ -255,6 +255,26 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:
 #taskModal table{width:100%;border-collapse:collapse;font-size:13px}
 #taskModal th,#taskModal td{text-align:left;padding:5px 7px;border-bottom:1px solid var(--line)}
 
+#asksec .chatlog{max-height:440px;overflow:auto;display:flex;flex-direction:column;gap:10px;margin:12px 0 10px;padding:2px}
+#asksec .chatlog:empty{display:none}
+.msg{max-width:94%;font-size:14px;line-height:1.55}
+.msg.user{align-self:flex-end;background:var(--accent);color:#fff;border-radius:12px 12px 3px 12px;padding:8px 13px}
+.msg.bot{align-self:flex-start;background:var(--bg);border:1px solid var(--line);border-radius:12px 12px 12px 3px;padding:11px 14px;min-width:0}
+.plan{margin-top:9px;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--panel)}
+.plan-h{font:600 10.5px "JetBrains Mono",monospace;color:var(--accent);padding:5px 11px;border-bottom:1px solid var(--line);letter-spacing:.03em}
+.plan-s{display:flex;gap:9px;align-items:center;padding:6px 11px;font-size:12.5px;color:var(--muted);border-bottom:1px solid var(--line)}
+.plan-s:last-child{border-bottom:0}
+.plan-s .n{width:18px;height:18px;border-radius:5px;background:var(--accent-soft);color:var(--accent);font:600 11px "Space Grotesk",sans-serif;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+.opts{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+.opt{border:1px solid color-mix(in srgb,var(--accent) 40%,var(--line));background:var(--accent-soft);color:var(--accent);border-radius:8px;padding:6px 13px;font:600 13px "Hanken Grotesk",sans-serif;cursor:pointer}
+.opt:hover{background:var(--accent);color:#fff}
+.chatsugg{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.sugg{border:1px solid var(--line);background:var(--panel);color:var(--muted);border-radius:999px;padding:4px 11px;font-size:12px;cursor:pointer}
+.sugg:hover{border-color:var(--accent);color:var(--accent)}
+.chattab{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:8px}
+.chattab th,.chattab td{border-bottom:1px solid var(--line);padding:4px 7px;text-align:left}
+.chatrep{max-height:320px;overflow:auto;font-size:11.5px;margin-top:8px;white-space:pre-wrap}
+
 </style>
 <script>(function(){try{var t=localStorage.getItem("ddd-theme")||"light";document.documentElement.setAttribute("data-theme",t);}catch(e){document.documentElement.setAttribute("data-theme","light");}})();</script>
 </head>
@@ -269,6 +289,16 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:
   <button class="theme-btn" id="themeBtn" onclick="toggleTheme()" aria-label="Switch between light and dark"></button>
 </header>
 <main>
+  <section class="w12" id="asksec">
+    <h2>Ask ddd</h2>
+    <p class="muted" style="font-size:13px;margin:-4px 0 4px">Ask in plain language. The analyst plans it, asks if it needs to, runs the right analysis across the company, and interprets the result.</p>
+    <div id="chatLog" class="chatlog"></div>
+    <div class="row">
+      <input id="chatIn" placeholder="e.g. repurposing candidates for rheumatoid arthritis" onkeydown="if(event.key==='Enter')askDdd()">
+      <button onclick="askDdd()">Ask</button>
+    </div>
+    <div class="chatsugg" id="chatSugg"></div>
+  </section>
   <section class="w7">
     <h2>Run an evaluation</h2>
     <div class="row">
@@ -793,24 +823,50 @@ function drawCell(){
   const ink=cvar("--ink"), line=cvar("--line"), muted=cvar("--muted"), panel=cvar("--panel");
   const motion=$("cellMotion").checked; const t=cellT;
 
-  // cytoplasm + membrane
-  ctx.beginPath(); ctx.arc(cx,cy,S*0.92,0,7); ctx.fillStyle=cvar("--bg"); ctx.fill();
-  ctx.beginPath(); ctx.arc(cx,cy,S*0.92,0,7); ctx.strokeStyle=CELL_COMP.membrane.color; ctx.lineWidth=3; ctx.globalAlpha=.8; ctx.stroke();
-  ctx.beginPath(); ctx.arc(cx,cy,S*0.885,0,7); ctx.lineWidth=1.5; ctx.globalAlpha=.4; ctx.stroke(); ctx.globalAlpha=1;
-  // mitochondria (two beans)
-  CELL_COMP.mitochondrion.clusters.forEach(a=>{
-    const mx=cx+Math.cos(a)*S*0.6, my=cy+Math.sin(a)*S*0.6;
-    ctx.save(); ctx.translate(mx,my); ctx.rotate(a+1.57);
-    ctx.beginPath(); ctx.ellipse(0,0,S*0.14,S*0.06,0,0,7); ctx.fillStyle="rgba(245,158,11,.14)"; ctx.fill();
-    ctx.strokeStyle="rgba(245,158,11,.5)"; ctx.lineWidth=1.3; ctx.stroke(); ctx.restore();
+  const ph = motion ? t : 0;
+  // cytoplasm + breathing phospholipid-bilayer membrane
+  const Rm = S*0.92 + Math.sin(ph*0.6)*S*0.006;
+  ctx.beginPath(); ctx.arc(cx,cy,Rm,0,7); ctx.fillStyle=cvar("--bg"); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx,cy,Rm,0,7); ctx.strokeStyle=CELL_COMP.membrane.color; ctx.lineWidth=3; ctx.globalAlpha=.8; ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx,cy,Rm-S*0.035,0,7); ctx.lineWidth=1.5; ctx.globalAlpha=.4; ctx.stroke();
+  ctx.lineWidth=1; ctx.globalAlpha=.22;
+  for(let i=0;i<64;i++){ const a=(i/64)*6.283+ph*0.04, r1=Rm-S*0.035, r2=Rm; ctx.beginPath(); ctx.moveTo(cx+Math.cos(a)*r1,cy+Math.sin(a)*r1); ctx.lineTo(cx+Math.cos(a)*r2,cy+Math.sin(a)*r2); ctx.stroke(); }
+  ctx.globalAlpha=1;
+  // mitochondria with cristae, gently bobbing
+  CELL_COMP.mitochondrion.clusters.forEach((a,ci)=>{
+    const bob=Math.sin(ph*0.8+ci)*S*0.02;
+    ctx.save(); ctx.translate(cx+Math.cos(a)*S*0.6+bob,cy+Math.sin(a)*S*0.6); ctx.rotate(a+1.57+Math.sin(ph*0.3+ci)*0.1);
+    ctx.beginPath(); ctx.ellipse(0,0,S*0.14,S*0.06,0,0,7); ctx.fillStyle="rgba(245,158,11,.16)"; ctx.fill();
+    ctx.strokeStyle="rgba(245,158,11,.6)"; ctx.lineWidth=1.3; ctx.stroke();
+    ctx.lineWidth=1; ctx.strokeStyle="rgba(245,158,11,.45)";
+    for(let k=-3;k<=3;k++){ const xx=k*S*0.035; ctx.beginPath(); ctx.moveTo(xx,-S*0.045); ctx.quadraticCurveTo(xx+S*0.018,0,xx,S*0.045); ctx.stroke(); }
+    ctx.restore();
   });
-  // ER arcs near nucleus
-  ctx.strokeStyle="rgba(236,72,153,.4)"; ctx.lineWidth=1.3;
-  for(let k=0;k<3;k++){ ctx.beginPath(); ctx.arc(cx+S*0.33*Math.cos(-0.15),cy+S*0.33*Math.sin(-0.15),S*(0.07+k*0.03),0.6,2.4); ctx.stroke(); }
-  // nucleus
-  ctx.beginPath(); ctx.arc(cx,cy,S*0.3,0,7); ctx.fillStyle="rgba(139,92,246,.13)"; ctx.fill();
-  ctx.strokeStyle="rgba(139,92,246,.55)"; ctx.lineWidth=1.5; ctx.stroke();
-  ctx.beginPath(); ctx.arc(cx-S*0.08,cy+S*0.05,S*0.05,0,7); ctx.fillStyle="rgba(139,92,246,.3)"; ctx.fill();
+  // Golgi stack + transport vesicles heading to the membrane
+  (function(){ const ga=(CELL_COMP.golgi.ang[0]+CELL_COMP.golgi.ang[1])/2, gx=cx+Math.cos(ga)*S*0.34, gy=cy+Math.sin(ga)*S*0.34;
+    ctx.save(); ctx.translate(gx,gy); ctx.rotate(ga); ctx.strokeStyle="rgba(217,119,6,.6)"; ctx.lineWidth=2;
+    for(let k=0;k<4;k++){ ctx.beginPath(); ctx.arc(0,k*S*0.012,S*(0.05+k*0.018),Math.PI*0.15,Math.PI*0.85); ctx.stroke(); } ctx.restore();
+    ctx.fillStyle="rgba(217,119,6,.5)";
+    for(let v=0;v<5;v++){ const prog=((ph*0.08+v*0.2)%1), vr=S*(0.34+prog*0.55), va=ga+Math.sin(v*2.1)*0.25; ctx.beginPath(); ctx.arc(cx+Math.cos(va)*vr,cy+Math.sin(va)*vr,S*0.012*(1-prog*0.4),0,7); ctx.fill(); }
+  })();
+  // rough ER with ribosomes, hugging one side of the nucleus
+  var ex=cx+S*0.32*Math.cos(-0.15), ey=cy+S*0.32*Math.sin(-0.15);
+  ctx.strokeStyle="rgba(236,72,153,.5)"; ctx.lineWidth=1.4;
+  for(let k=0;k<4;k++){ const wob=Math.sin(ph*0.5+k)*0.05; ctx.beginPath(); ctx.arc(ex,ey,S*(0.34+k*0.028),0.5+wob,2.5+wob); ctx.stroke(); }
+  ctx.fillStyle="rgba(236,72,153,.55)";
+  for(let k=0;k<24;k++){ const rr=S*(0.34+(k%4)*0.028), aa=0.5+(k/24)*2.0+Math.sin(ph*0.5+k); ctx.beginPath(); ctx.arc(ex+Math.cos(aa)*rr,ey+Math.sin(aa)*rr,S*0.006,0,7); ctx.fill(); }
+  // lysosomes drifting in the cytoplasm
+  ctx.fillStyle="rgba(100,116,139,.4)";
+  for(let v=0;v<3;v++){ const la=v*2.1+ph*0.1, lr=S*(0.55+0.08*Math.sin(ph*0.4+v)); ctx.beginPath(); ctx.arc(cx+Math.cos(la)*lr,cy+Math.sin(la)*lr,S*0.018,0,7); ctx.fill(); }
+  // nucleus: pulsing double envelope, nuclear pores, drifting nucleolus
+  const Rn=S*0.3+Math.sin(ph*0.7)*S*0.004;
+  ctx.beginPath(); ctx.arc(cx,cy,Rn,0,7); ctx.fillStyle="rgba(139,92,246,.13)"; ctx.fill();
+  ctx.strokeStyle="rgba(139,92,246,.6)"; ctx.lineWidth=1.6; ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx,cy,Rn-S*0.012,0,7); ctx.lineWidth=1; ctx.globalAlpha=.5; ctx.stroke(); ctx.globalAlpha=1;
+  ctx.fillStyle="rgba(139,92,246,.6)";
+  for(let i=0;i<18;i++){ const a=(i/18)*6.283; ctx.beginPath(); ctx.arc(cx+Math.cos(a)*Rn,cy+Math.sin(a)*Rn,S*0.009,0,7); ctx.fill(); }
+  const nlx=cx-S*0.07+Math.cos(ph*0.3)*S*0.02, nly=cy+S*0.04+Math.sin(ph*0.3)*S*0.02;
+  ctx.beginPath(); ctx.arc(nlx,nly,S*(0.05+0.004*Math.sin(ph)),0,7); ctx.fillStyle="rgba(139,92,246,.35)"; ctx.fill();
 
   // links
   ctx.lineWidth=1; ctx.globalAlpha=.35+(motion?Math.sin(t*1.5)*0.15:0);
@@ -860,6 +916,7 @@ const TOUR=[
  {page:'hq', sel:'.brand', title:'Welcome to the company', body:'This is HQ — the lobby of a drug-discovery company that runs itself. No human staff; six software agents do the work. Take 90 seconds to see it.'},
  {page:'hq', sel:'#kpis', title:'The live numbers', body:'How much the company knows (its knowledge graph) and what it has been doing lately. These update as it works.'},
  {page:'hq', sel:'#depts', title:'Six agent departments', body:'Each card is an agent with a job — Intelligence, Target Biology, Chemistry and so on. Each can run "playbooks" on request or on a schedule. Next, we go to the Lab where you can try things.'},
+ {page:'lab', sel:'#asksec', title:'Ask ddd anything', body:'Type a question in plain language — the analyst plans it, asks if it needs to, runs the right analysis across the company, and interprets it.'},
  {page:'lab', sel:'#kgsec', title:'What the company knows', body:'The knowledge graph. Type a disease, gene or drug and press Visualize — a living web of real biological links. Double-click any dot to grow it.'},
  {page:'lab', sel:'#hypsec', title:'Ask it questions', body:'Check whether two things are linked and how believable it is — or ask for NOVEL targets the graph implies but was never told. Fresh, testable hypotheses.'},
  {page:'lab', sel:'#cellsec', title:'See it as a living cell', body:'Type a disease and Build cell: its target proteins appear in their real compartments — nucleus, membrane, and so on — and move.'},
@@ -1085,6 +1142,62 @@ function taskCanvas(id){
     "&bull; A stronger learned model (fingerprint MLP / GNN) is feasible on CPU at this dataset size; a custom architecture can be drawn on a model canvas (your DNN Designer) and its scores brought back here.<br>"+
     '<button style="margin-top:8px" onclick="makeTaskModel(\''+id+'\')">Make the baseline now</button>';
 }
+
+</script>
+<script>
+
+/* ---- Ask ddd: the plain-language analyst chat ---- */
+const CHAT_SUGG=["repurposing candidates for rheumatoid arthritis","program plan for LAMA2 muscular dystrophy","is TERT linked to idiopathic pulmonary fibrosis","novel targets for lung cancer","build a cell for psoriasis","drugs for influenza"];
+let LAST_CLARIFY=null;
+function chatSugg(){var el=document.getElementById("chatSugg");if(el)el.innerHTML=CHAT_SUGG.map(function(s){return '<button class="sugg" onclick="askDdd(this.textContent)">'+esc(s)+'</button>';}).join("");}
+function mdB(s){return esc(s).replace(/\*\*([^*]+)\*\*/g,"<b>$1</b>");}
+function chatAdd(who,html){var d=document.createElement("div");d.className="msg "+who;d.innerHTML=html;var log=document.getElementById("chatLog");log.appendChild(d);log.scrollTop=log.scrollHeight;return d;}
+function planHtml(plan){return (plan&&plan.length)?('<div class="plan"><div class="plan-h">PLAN</div>'+plan.map(function(p,i){return '<div class="plan-s"><span class="n">'+(i+1)+'</span>'+esc(p)+'</div>';}).join("")+'</div>'):"";}
+async function askDdd(preset){
+  var q=preset||document.getElementById("chatIn").value.trim(); if(!q)return;
+  if(!preset)document.getElementById("chatIn").value="";
+  chatAdd("user",esc(q));
+  var th=chatAdd("bot",'<span class="muted">Thinking\u2026</span>');
+  try{var r=await api("/api/analyst",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({q:q})});th.remove();renderAnalyst(r,q);}
+  catch(e){th.innerHTML='<span class="err">'+esc(e.message)+'</span>';}
+}
+async function chatChoice(choice){
+  var c=LAST_CLARIFY; if(!c)return; LAST_CLARIFY=null;
+  chatAdd("user",esc(choice));
+  var th=chatAdd("bot",'<span class="muted">Working\u2026</span>');
+  try{var r=await api("/api/analyst",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({q:c.q,choice:choice,pending:c.pending})});th.remove();renderAnalyst(r,c.q);}
+  catch(e){th.innerHTML='<span class="err">'+esc(e.message)+'</span>';}
+}
+function renderAnalyst(r,q){
+  if(r.kind==="clarify"){
+    LAST_CLARIFY={pending:r.pending,q:q};
+    var opts=r.options.map(function(o){return '<button class="opt" onclick="chatChoice(\''+o.value.replace(/'/g,"\\'")+'\')">'+esc(o.label)+'</button>';}).join("");
+    chatAdd("bot",mdB(r.say)+'<div class="opts">'+opts+'</div>');return;
+  }
+  if(r.kind==="answer"){chatAdd("bot",mdB(r.say));return;}
+  if(r.kind==="ui"){
+    chatAdd("bot",mdB(r.say)+planHtml(r.plan));
+    if(r.ui.action==="cell"&&typeof loadCell==="function"){document.getElementById("cellDis").value=r.ui.entity;loadCell();document.getElementById("cellsec").scrollIntoView({behavior:"smooth"});}
+    else if(r.ui.action==="graph"&&typeof kgViz==="function"){document.getElementById("kgq").value=r.ui.entity;kgViz();document.getElementById("kgsec").scrollIntoView({behavior:"smooth"});}
+    return;
+  }
+  if(r.kind==="data"){
+    var html=mdB(r.say)+planHtml(r.plan),d=r.result.data;
+    if(r.result.type==="predict"){html+='<table class="chattab"><tr><th>#</th><th>Gene</th><th>AA</th><th>drugs</th></tr>'+(d.predictions||[]).slice(0,10).map(function(p,i){return '<tr><td>'+(i+1)+'</td><td><b>'+esc(p.name)+'</b></td><td>'+p.adamic_adar+'</td><td>'+(p.known_drugs||0)+'</td></tr>';}).join("")+'</table>';}
+    else if(r.result.type==="hypothesis"){html+='<p style="margin:8px 0 0"><b>'+esc(d.plausibility)+'</b> \u2014 '+esc(d.reading)+' <span class="muted">(common '+d.scores.common_neighbors+', AA '+d.scores.adamic_adar+', hops '+(d.path_hops||"\u2014")+')</span></p>';}
+    chatAdd("bot",html);return;
+  }
+  if(r.kind==="run"){var card=chatAdd("bot",mdB(r.say)+planHtml(r.plan)+'<div class="runout muted" style="margin-top:8px;font-size:12.5px">Running\u2026</div>');chatWatch(r.run_id,card);return;}
+}
+async function chatWatch(id,card){
+  try{
+    var r=await api("/api/company/runs/"+id),out=card.querySelector(".runout");
+    if(r.status==="done"&&r.report){var txt=await (await fetch("/api/company/reports/"+encodeURIComponent(r.report))).text();out.classList.remove("muted");out.innerHTML='<pre class="mono chatrep">'+esc(txt)+'</pre>';}
+    else if(r.status==="error"){out.innerHTML='<span class="err">'+esc((r.summary&&r.summary.error)||"failed")+'</span>';}
+    else{out.textContent=(r.log?r.log.trim().split("\n").slice(-1)[0]:"Running\u2026");setTimeout(function(){chatWatch(id,card);},2000);}
+  }catch(e){var o=card.querySelector(".runout");if(o)o.textContent=e.message;}
+}
+chatSugg();
 
 </script>
 <script>function toggleTheme(){var h=document.documentElement;var n=h.getAttribute("data-theme")==="dark"?"light":"dark";h.setAttribute("data-theme",n);try{localStorage.setItem("ddd-theme",n);}catch(e){}paintThemeBtn();}function paintThemeBtn(){var b=document.getElementById("themeBtn");if(b)b.textContent=document.documentElement.getAttribute("data-theme")==="dark"?"\u2600 Light":"\u263e Dark";}paintThemeBtn();</script>

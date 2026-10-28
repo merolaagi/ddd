@@ -220,6 +220,21 @@ def vcell_cell(disease: str, limit: int = 22):
     return _kg(kg.cell_view, disease, limit)
 
 
+class AnalystReq(BaseModel):
+    q: str = ""
+    choice: str | None = None
+    pending: dict | None = None
+
+
+@app.post("/api/analyst")
+def analyst(req: AnalystReq):
+    from . import analyst as an
+    try:
+        return an.handle(req.q, req.choice, req.pending)
+    except Exception as e:
+        return {"kind": "answer", "say": f"Something went wrong: {str(e)[:160]}"}
+
+
 @app.get("/api/sources/opentargets/disease")
 def ot_disease(disease: str, size: int = 25, write: bool = True):
     from .sources import opentargets
