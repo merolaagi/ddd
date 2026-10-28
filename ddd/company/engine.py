@@ -84,6 +84,12 @@ PLAYBOOKS = {p.name: p for p in [
              "Every available task × every baseline (and optionally every Ollama model); flags regressions.",
              {"include_llm": {"type": "bool", "default": False}, "llm_sample": {"type": "int", "default": 50}},
              pb.bench_full_sweep),
+    Playbook("deg_interpret", "DEG / gene-set interpretation", "bio",
+             "Interpret a differential-expression gene set against the graph: which diseases and pathways "
+             "it maps to, and which genes are druggable. Needs Neo4j + PrimeKG.",
+             {"genes": {"type": "text", "default": "STAT1\nIRF1\nCXCL10\nGBP1\nTAP1\nIDO1\nCXCL9"},
+              "disease": {"type": "str", "default": ""}},
+             pb.deg_interpret),
     Playbook("bio_target_dossier", "Target dossier", "bio",
              "Ranked candidate targets, known drugs and graph context for a disease (needs Neo4j + PrimeKG).",
              {"disease": {"type": "str", "default": "idiopathic pulmonary fibrosis"}, "top": {"type": "int", "default": 12},

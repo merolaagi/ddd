@@ -200,6 +200,18 @@ hypothesis, novel-target prediction, the cell, the graph, a program plan or a
 benchmark — and interprets the result inline. Rules-based routing: instant, no
 model API, orchestrating the same playbooks and graph tools as the rest of ddd.
 
+It also grounds answers in **literature** (`ddd/sources/literature.py`,
+`/api/literature`) via Europe PMC — ask *"what's known about X"* for ranked,
+citable papers (a Chroma vector store can cache/embed these for RAG later).
+
+## DEG / gene-set interpretation
+
+`deg_interpret {genes}` (Target Biology dept, and the Lab's **DEG** panel):
+paste a differential-expression gene set and it maps the set onto the graph —
+which diseases and pathways it's most connected to, and which genes are already
+druggable. The "interpret your results in biological context" layer (the RNA-Seq
+interpretation space), graph-grounded rather than a bare enrichment test.
+
 ## Knowledge graph viewer
 
 The Lab's **Knowledge graph** panel renders PrimeKG subgraphs interactively,

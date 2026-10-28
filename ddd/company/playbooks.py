@@ -787,6 +787,14 @@ def disease_repurposing(ctx, disease: str, top: int = 10, max_compounds: int = 2
             "top_compound": ranked[0].get("chembl_id") if ranked else None}, lines
 
 
+# ---------------------------------------------------------------- Omics interpretation
+
+def deg_interpret(ctx, genes: str | list, disease: str = ""):
+    """Interpret a DEG / gene set against the graph (diseases, pathways, druggable genes)."""
+    from . import deg
+    return deg.interpret(ctx, genes, disease)
+
+
 # ---------------------------------------------------------------- Program Operations
 
 def program_plan(ctx, disease: str, modality: str = "small molecule", lead: str = "", top: int = 8):

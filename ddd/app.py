@@ -226,6 +226,15 @@ class AnalystReq(BaseModel):
     pending: dict | None = None
 
 
+@app.get("/api/literature")
+def api_literature(q: str, limit: int = 8):
+    from .sources import literature
+    try:
+        return literature.search(q, limit)
+    except Exception as e:
+        raise HTTPException(502, f"Europe PMC: {str(e)[:160]}")
+
+
 @app.post("/api/analyst")
 def analyst(req: AnalystReq):
     from . import analyst as an

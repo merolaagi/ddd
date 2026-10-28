@@ -12,6 +12,7 @@ import re
 
 from . import kg, kg_model
 from .company import engine
+from .sources import literature
 
 _VIRUS = re.compile(r"\b(viral|virus|influenza|flu|covid|sars|sars-cov-2|rsv|rhinovirus|parainfluenza|coronavirus)\b", re.I)
 _BACT = re.compile(r"\b(bacteri\w*|tuberculosis|tb|mycobacter\w*|staph\w*|mrsa|aureus|e\.?\s?coli|escherichia|pseudomonas|aeruginosa)\b", re.I)
@@ -99,6 +100,22 @@ def handle(q: str, choice: str | None = None, pending: dict | None = None) -> di
         return _start("program_plan", {"disease": ent, "modality": mod},
                       ["Pull target ranking", "Stage experiments", "List CROs & draft outreach", "Set milestones & gates"],
                       f"Drafting a **{mod}** program plan for **{ent}**.")
+
+    # ---- literature ----
+    if re.search(r"literature|papers?|publications?|what'?s known about|pubmed|studies on|evidence (for|on)", ql):
+        ent = _tail(q)
+        try:
+            r = literature.search(ent, 8)
+            return {"kind": "data", "say": f"Key literature on **{ent}**:",
+                    "plan": ["Search Europe PMC", "Rank by citations"],
+                    "result": {"type": "literature", "data": r}}
+        except Exception as e:
+            return {"kind": "answer", "say": f"Literature search failed: {str(e)[:140]}"}
+
+    # ---- DEG / gene-set interpretation ----
+    if re.search(r"\bdeg\b|differential expression|gene set|interpret these genes|rna-?seq", ql):
+        return {"kind": "answer", "say": "Paste your gene list into the **DEG / gene-set interpretation** panel below and run it — "
+                "it maps the set onto diseases, pathways and druggable genes."}
 
     # ---- repurposing / "drugs for" / "treatment for" ----
     if re.search(r"\brepurpos\w+|candidate drugs?|drugs? for|treat(ment)? for|therap(y|ies) for|compounds? for|cure for\b", ql):

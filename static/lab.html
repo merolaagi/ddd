@@ -351,6 +351,13 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:
     </div>
     <pre id="repOut" class="mono" style="max-height:540px">Pick a mode, type a disease / virus / bacterium, and Run.</pre>
   </section>
+  <section class="w12" id="degsec">
+    <h2>DEG / gene-set interpretation</h2>
+    <p class="muted" style="font-size:13px;margin:-4px 0 12px">Paste a differential-expression gene set (symbols; the first token per line is used) &mdash; it maps the set onto the diseases, pathways and druggable genes in your graph.</p>
+    <div class="row"><textarea id="degGenes" placeholder="STAT1, IRF1, CXCL10, GBP1, TAP1, IDO1, CXCL9" style="min-height:90px"></textarea></div>
+    <div class="row" style="margin-top:8px"><input id="degDisease" placeholder="optional disease context" style="flex:2"><button onclick="runDeg()">Interpret gene set</button></div>
+    <pre id="degOut" class="mono" style="max-height:520px">Paste a gene set and run.</pre>
+  </section>
   <section class="w6" id="indexsec">
     <h2>Benchmark Index</h2>
     <p class="muted" style="font-size:13px;margin:-4px 0 10px">Open benchmarks, each with a known caveat. O3DC-style, local and extensible.</p>
@@ -1184,7 +1191,7 @@ function renderAnalyst(r,q){
   if(r.kind==="data"){
     var html=mdB(r.say)+planHtml(r.plan),d=r.result.data;
     if(r.result.type==="predict"){html+='<table class="chattab"><tr><th>#</th><th>Gene</th><th>AA</th><th>drugs</th></tr>'+(d.predictions||[]).slice(0,10).map(function(p,i){return '<tr><td>'+(i+1)+'</td><td><b>'+esc(p.name)+'</b></td><td>'+p.adamic_adar+'</td><td>'+(p.known_drugs||0)+'</td></tr>';}).join("")+'</table>';}
-    else if(r.result.type==="hypothesis"){html+='<p style="margin:8px 0 0"><b>'+esc(d.plausibility)+'</b> \u2014 '+esc(d.reading)+' <span class="muted">(common '+d.scores.common_neighbors+', AA '+d.scores.adamic_adar+', hops '+(d.path_hops||"\u2014")+')</span></p>';}
+    else if(r.result.type==="hypothesis"){html+='<p style="margin:8px 0 0"><b>'+esc(d.plausibility)+'</b> \u2014 '+esc(d.reading)+' <span class="muted">(common '+d.scores.common_neighbors+', AA '+d.scores.adamic_adar+', hops '+(d.path_hops||"\u2014")+')</span></p>';}else if(r.result.type==="literature"){var ps=(d.papers||[]);html+=ps.length?('<div style="margin-top:8px">'+ps.map(function(p){return '<div style="padding:6px 0;border-bottom:1px solid var(--line)"><a href="'+(p.url||"#")+'" target="_blank" style="font-weight:600">'+esc(p.title||"untitled")+'</a>'+'<div class="muted" style="font-size:12px">'+esc(p.authors||"")+' · '+esc(p.journal||"")+' '+esc(p.year||"")+(p.cited!=null?(" · cited "+p.cited):"")+'</div></div>';}).join("")+'</div>'):'<p class="muted">No papers found.</p>';}
     chatAdd("bot",html);return;
   }
   if(r.kind==="run"){var card=chatAdd("bot",mdB(r.say)+planHtml(r.plan)+'<div class="runout muted" style="margin-top:8px;font-size:12.5px">Running\u2026</div>');chatWatch(r.run_id,card);return;}
@@ -1199,6 +1206,21 @@ async function chatWatch(id,card){
 }
 chatSugg();
 
+</script>
+<script>
+async function runDeg(){
+  var genes=document.getElementById("degGenes").value.trim(); if(!genes)return;
+  document.getElementById("degOut").textContent="Interpreting gene set\u2026";
+  try{var r=await api("/api/company/run/deg_interpret",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({params:{genes:genes,disease:document.getElementById("degDisease").value.trim()}})});degWatch(r.run_id);}
+  catch(e){document.getElementById("degOut").textContent=e.message;}
+}
+async function degWatch(id){
+  try{var r=await api("/api/company/runs/"+id);
+    if(r.status==="done"&&r.report){document.getElementById("degOut").textContent=await (await fetch("/api/company/reports/"+encodeURIComponent(r.report))).text();}
+    else if(r.status==="error"){document.getElementById("degOut").textContent="Error: "+((r.summary&&r.summary.error)||"failed");}
+    else{document.getElementById("degOut").textContent=(r.log||"Working\u2026");setTimeout(function(){degWatch(id);},2000);}
+  }catch(e){document.getElementById("degOut").textContent=e.message;}
+}
 </script>
 <script>function toggleTheme(){var h=document.documentElement;var n=h.getAttribute("data-theme")==="dark"?"light":"dark";h.setAttribute("data-theme",n);try{localStorage.setItem("ddd-theme",n);}catch(e){}paintThemeBtn();}function paintThemeBtn(){var b=document.getElementById("themeBtn");if(b)b.textContent=document.documentElement.getAttribute("data-theme")==="dark"?"\u2600 Light":"\u263e Dark";}paintThemeBtn();</script>
 </body>
