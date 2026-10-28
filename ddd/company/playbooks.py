@@ -787,6 +787,35 @@ def disease_repurposing(ctx, disease: str, top: int = 10, max_compounds: int = 2
             "top_compound": ranked[0].get("chembl_id") if ranked else None}, lines
 
 
+# ---------------------------------------------------------------- Program Operations
+
+def program_plan(ctx, disease: str, modality: str = "small molecule", lead: str = "", top: int = 8):
+    """Pipeline-in-a-Person: turn a disease + modality into a runnable program
+    plan (staged experiments, CRO tasks, outreach drafts, milestones, gates),
+    grounded in ddd's target ranking where the graph is available."""
+    from . import program_ops
+    targets = []
+    try:
+        if kg.status().get("connected"):
+            name = kg.find_disease(disease) or disease
+            targets = [t["gene"] for t in kg.disease_candidate_targets(name, top)]
+            if targets:
+                ctx.log(f"Targets from graph: {', '.join(targets)}")
+    except Exception as e:
+        ctx.log(f"graph targets skipped: {str(e)[:80]}")
+    if not targets:
+        try:
+            from ..sources import opentargets
+            r = opentargets.enrich_disease(disease, size=top, write=False)
+            targets = [t["symbol"] for t in r.get("targets", [])][:top]
+            if targets:
+                ctx.log(f"Targets from Open Targets: {', '.join(targets)}")
+        except Exception as e:
+            ctx.log(f"Open Targets skipped: {str(e)[:80]}")
+    ctx.log(f"Drafting {modality} program plan for {disease}")
+    return program_ops.build_plan(disease, modality, targets, lead)
+
+
 # ---------------------------------------------------------------- Discovery programs
 
 def discovery_program(ctx, disease: str, molecules: str | list = "", top_targets: int = 15):

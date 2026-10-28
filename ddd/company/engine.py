@@ -52,6 +52,10 @@ DEPARTMENTS = [
     Department("pub", "Publishing", "Herald",
                "Publish the weekly digest, the open benchmark index and the public leaderboard page.",
                ["digests published"]),
+    Department("ops", "Program Operations", "Producer",
+               "Turn a validated lead into a runnable program: staged experiments, CRO tasks, outreach and "
+               "milestones — the Pipeline-in-a-Person orchestration a solo founder needs.",
+               ["programs planned"]),
 ]
 DEPT = {d.id: d for d in DEPARTMENTS}
 
@@ -89,6 +93,14 @@ PLAYBOOKS = {p.name: p for p in [
              "Properties, six baseline predictions and red flags for up to 50 SMILES.",
              {"smiles": {"type": "text", "default": "CC(=O)Oc1ccccc1C(=O)O\nCN1CCC[C@H]1c1cccnc1"},
               "label": {"type": "str", "default": ""}}, pb.chem_molecule_triage),
+    Playbook("program_plan", "Program plan", "ops",
+             "Turn a disease + modality into a staged experimental program: CRO task list, outreach drafts, "
+             "milestones and go/no-go gates (small molecule or antibody). Grounded in ddd's target ranking.",
+             {"disease": {"type": "str", "default": "LAMA2-related muscular dystrophy"},
+              "modality": {"type": "str", "default": "antibody"},
+              "lead": {"type": "str", "default": ""},
+              "top": {"type": "int", "default": 8}},
+             pb.program_plan),
     Playbook("antiviral_repurposing", "Antiviral repurposing", "programs",
              "For a respiratory virus: host-directed targets (entry/replication factors) → their ChEMBL "
              "inhibitors as repurposing candidates, triaged and ranked. Host-directed, not validated.",
@@ -164,6 +176,9 @@ def recommend_next(playbook: str, summary) -> list:
             recs.append({"label": f"Rank compounds for {d}", "playbook": "disease_repurposing",
                          "params": {"disease": d}, "auto": True,
                          "why": "Turn these ranked targets into candidate drugs."})
+            recs.append({"label": f"Draft a program plan for {d}", "playbook": "program_plan",
+                         "params": {"disease": d}, "auto": False,
+                         "why": "Lay out the staged experiments and CROs to validate these targets."})
     elif playbook in ("disease_repurposing", "antiviral_repurposing", "antibacterial_repurposing"):
         tgt = s.get("top_target")
         if tgt:
@@ -173,6 +188,11 @@ def recommend_next(playbook: str, summary) -> list:
         recs.append({"label": "Keep the ADMET/safety baselines current", "playbook": "bench_full_sweep",
                      "params": {}, "auto": False,
                      "why": "These baselines flag the candidates' tox and solubility."})
+        dz = s.get("disease") or s.get("virus") or s.get("bacterium")
+        if dz:
+            recs.append({"label": f"Draft a program plan for {dz}", "playbook": "program_plan",
+                         "params": {"disease": dz}, "auto": False,
+                         "why": "Turn the ranked candidates into a staged, CRO-ready program (Pipeline-in-a-Person)."})
     elif playbook == "intel_watchlist_sweep":
         if s.get("changed"):
             recs.append({"label": "Publish an updated digest", "playbook": "pub_weekly_digest",

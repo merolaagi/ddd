@@ -56,6 +56,15 @@ change suggests publishing a digest). Set `"autopilot": true` in the charter and
 the agent **runs** the chainable recommendation on its own, bounded to 2 hops so
 it can't run away. Off by default; nothing fires automatically until you enable it.
 
+**Program Operations ("Pipeline-in-a-Person").** The `program_plan {disease,
+modality}` playbook (Program Operations dept) turns a discovery result into a
+runnable program: a staged experiment plan (small-molecule or antibody), a
+CRO/vendor task list, ready-to-fill RFQ outreach drafts, milestones with rough
+budget bands, and go/no-go gates — grounded in ddd's target ranking. It's the
+orchestration layer a solo founder needs; ddd drafts and tracks the plan, you
+make the calls. In-silico still can't cross the wet-lab/capital roadblock — this
+plans the work, it doesn't run the mice.
+
 ## Operating it from Claude (no API spend)
 
 The MCP server exposes `company_overview`, `company_run`,
