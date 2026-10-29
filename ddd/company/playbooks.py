@@ -354,6 +354,28 @@ def generative_design(ctx, target: str = "", seeds: str = "", organism: str = ""
     return {"candidates": len(cands), "explored": r["unique_explored"], "target": target or None}, lines
 
 
+def target_intel(ctx, target: str = ""):
+    """Readiness dossier: is this target already solved/drugged, or open space?"""
+    from . import target_intel as ti
+    if not target:
+        raise ValueError("Give a target gene or UniProt accession.")
+    return ti.dossier(ctx, target)
+
+
+def identify_sequence(ctx, sequence: str = ""):
+    """Identify a raw protein sequence (BLAST vs UniProtKB), then its dossier if known."""
+    from . import target_intel as ti
+    if not sequence or len(sequence.strip()) < 10:
+        raise ValueError("Paste a protein sequence (≥10 residues).")
+    return ti.identify(ctx, sequence)
+
+
+def structure_watch(ctx, targets: str = ""):
+    """Re-check a target watchlist for newly released structures / drugs and diff."""
+    from . import target_intel as ti
+    return ti.watch(ctx, targets)
+
+
 # ---------------------------------------------------------------- Publishing
 
 _GH_CACHE = COMPANY_DIR / "github_cache.json"

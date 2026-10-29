@@ -288,6 +288,18 @@ def api_structure(target: str):
         raise HTTPException(502, f"structure: {str(e)[:200]}")
 
 
+@app.get("/api/target_intel")
+def api_target_intel(target: str):
+    from .company import target_intel as ti
+    class _C:
+        def log(self, *a): pass
+    try:
+        summary, lines = ti.dossier(_C(), target)
+        return {"ok": True, "summary": summary, "markdown": "\n".join(lines)}
+    except Exception as e:
+        raise HTTPException(502, f"target_intel: {str(e)[:200]}")
+
+
 @app.post("/api/analyst")
 def analyst(req: AnalystReq):
     from . import analyst as an

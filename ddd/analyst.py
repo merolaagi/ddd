@@ -50,7 +50,8 @@ def _start(playbook: str, params: dict, plan: list, say: str) -> dict:
 
 HELP = ("I can: rank **targets** for a disease, find **repurposing** candidates "
         "(human disease, virus, or bacterium), check a **hypothesis** between two things, "
-        "**predict novel targets**, **design novel molecules** for a target, **build the cell**, "
+        "**predict novel targets**, check if a target is **worth pursuing** (readiness), "
+        "**identify a sequence**, **design novel molecules** for a target, **build the cell**, "
         "**map the graph**, draft a **program plan**, "
         "or run a **benchmark**. Try: *\"repurposing candidates for rheumatoid arthritis\"* or "
         "*\"program plan for LAMA2 muscular dystrophy\"*.")
@@ -180,6 +181,23 @@ def handle(q: str, choice: str | None = None, pending: dict | None = None) -> di
                     "result": {"type": "hypothesis", "data": r}}
         except Exception as e:
             return {"kind": "answer", "say": f"Graph unavailable: {str(e)[:140]}"}
+
+    # ---- identify a raw sequence ----
+    if re.search(r"\bidentify\b.{0,20}sequence|what (protein|is this sequence)|blast\b", ql) \
+            or re.search(r"^[ACDEFGHIKLMNPQRSTVWY\s]{25,}$", q.upper()):
+        seq = q if re.search(r"^[ACDEFGHIKLMNPQRSTVWY\s]{25,}$", q.upper()) else _tail(q)
+        return _start("identify_sequence", {"sequence": seq},
+                      ["blastp vs UniProtKB", "Identify top matches", "Dossier if it's a known protein"],
+                      "Identifying the sequence (BLAST can take up to ~2 min).")
+
+    # ---- target intelligence / readiness ----
+    if re.search(r"\b(good target|target readiness|worth pursuing|is .+ druggable|already (drugged|solved|a drug target)|"
+                 r"how crowded|target intel\w*|is .+ a target|readiness (of|for)|should we (go after|target))\b", ql):
+        ent = _tail(q)
+        return _start("target_intel", {"target": ent},
+                      ["Resolve identity (UniProt)", "Structure: AlphaFold + experimental PDB",
+                       "Druggability: ChEMBL + Open Targets", "Verdict: open space vs crowded"],
+                      f"Running a target-readiness check on **{ent}**.")
 
     # ---- protein structure (AlphaFold view) ----
     if re.search(r"\b(structure|alphafold|alpha ?fold|fold|3d structure|ribbon|cartoon|pae|crystal structure)\b", ql) \

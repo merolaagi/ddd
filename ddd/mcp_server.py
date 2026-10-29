@@ -117,6 +117,45 @@ def protein_structure(target: str) -> dict:
     return r
 
 
+class _NullCtx:
+    def log(self, *a): pass
+
+
+@mcp.tool()
+def target_intel(target: str) -> dict:
+    """Target readiness dossier: is this target already solved/drugged, or open space?
+    Combines identity (UniProt), structure (AlphaFold + experimental PDB), and
+    druggability (ChEMBL actives + Open Targets known drugs) into a verdict
+    (open space / lightly explored / emerging / crowded) with a recommended move.
+    The 'is this worth pursuing' answer."""
+    from .company import target_intel as ti
+    summary, lines = ti.dossier(_NullCtx(), target)
+    return {"ok": True, "summary": summary, "markdown": "\n".join(lines)}
+
+
+@mcp.tool()
+def identify_sequence(sequence: str) -> dict:
+    """Identify a raw protein sequence: blastp vs UniProtKB -> top matches, and if it's
+    a near-exact match to a known protein, its full target dossier. The 'what protein
+    did we just find, and is it already worked on' lookup. Asynchronous BLAST; may take
+    up to ~2 minutes."""
+    from .company import target_intel as ti
+    summary, lines = ti.identify(_NullCtx(), sequence)
+    return {"ok": True, "summary": summary, "markdown": "\n".join(lines)}
+
+
+@mcp.tool()
+def structure_watch(targets: list[str] | str) -> dict:
+    """Re-check a watchlist of targets (genes/UniProt) for newly released experimental
+    structures or drugs and diff against the last snapshot. Built for scheduled runs —
+    call company_schedule on the 'structure_watch' playbook to run it periodically."""
+    from .company import target_intel as ti
+    if isinstance(targets, list):
+        targets = "\n".join(targets)
+    summary, lines = ti.watch(_NullCtx(), targets)
+    return {"ok": True, "summary": summary, "markdown": "\n".join(lines)}
+
+
 @mcp.tool()
 async def run_benchmark(task: str, model: str = "rf", sample: int | None = None) -> dict:
     """Train/evaluate a model on a task's held-out scaffold split and record the score.

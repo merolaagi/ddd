@@ -359,6 +359,20 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:
     </div>
     <pre id="repOut" class="mono" style="max-height:540px">Pick a mode, type a disease / virus / bacterium, and Run.</pre>
   </section>
+  <section class="w12" id="intelsec">
+    <h2>Target intelligence <span class="muted" style="font-size:12px;font-weight:400">· is it worth pursuing?</span></h2>
+    <p class="muted" style="font-size:13px;margin:-4px 0 12px">Before committing design effort: is a target already solved (AlphaFold + experimental PDB) and drugged (ChEMBL + Open Targets), or is it open space? Identify a raw sequence ddd found, or watch a list of targets for newly released structures.</p>
+    <div class="row">
+      <select id="intelMode" onchange="intelMode()" style="flex:0;min-width:170px">
+        <option value="readiness">Readiness check</option>
+        <option value="identify">Identify sequence</option>
+        <option value="watch">Structure watch</option>
+      </select>
+      <textarea id="intelIn" rows="1" placeholder="target gene or UniProt — EGFR, KRAS, P00533" style="flex:1;min-width:260px;font-family:inherit"></textarea>
+      <button onclick="runIntel()">Run</button>
+    </div>
+    <pre id="intelOut" class="mono" style="max-height:560px">Pick a mode and run. Readiness: one target. Identify: paste a protein sequence. Watch: a list of targets (newline-separated).</pre>
+  </section>
   <section class="w12" id="structsec">
     <h2>Protein structure <span class="muted" style="font-size:12px;font-weight:400">· AlphaFold view</span></h2>
     <p class="muted" style="font-size:13px;margin:-4px 0 12px">The AlphaFold view of a target: its precomputed AlphaFold DB structure, coloured by per-residue confidence (pLDDT), next to the predicted aligned error (PAE) map — the same two panels the AlphaFold viewer shows. Fetches a known protein's existing prediction (not a de-novo fold of a new sequence).</p>
@@ -1176,6 +1190,29 @@ async function show3d(i){
     $("gen3dInfo").innerHTML="<b>#"+c.rank+"</b> · "+r.heavy_atoms+" heavy atoms · "+r.atoms+" with H · "+(r.forcefield||"no FF")+" energy "+(r.energy!=null?r.energy+" kcal/mol":"—")+"<br>Drag to rotate · scroll to zoom. Shape from ETKDG distance geometry + minimisation; energy is relative within this molecule.";
   }catch(e){$("gen3dInfo").textContent=e.message;}
 }
+
+/* ---- Target intelligence: readiness / identify / watch (async company run) ---- */
+var INTEL_MAP={readiness:{pb:"target_intel",key:"target",ph:"target gene or UniProt — EGFR, KRAS, P00533"},
+               identify:{pb:"identify_sequence",key:"sequence",ph:"paste a protein sequence (FASTA ok) — BLAST can take ~2 min"},
+               watch:{pb:"structure_watch",key:"targets",ph:"watchlist, one per line — EGFR\nKRAS\nTP53"}};
+function intelMode(){var m=INTEL_MAP[$("intelMode").value];if(m)$("intelIn").placeholder=m.ph;$("intelIn").rows=($("intelMode").value==="readiness")?1:4;}
+async function runIntel(){
+  var m=INTEL_MAP[$("intelMode").value], v=$("intelIn").value.trim(); if(!v){$("intelOut").textContent="Enter a target / sequence / watchlist.";return;}
+  $("intelOut").textContent="Running "+m.pb+" … (external lookups: AlphaFold, PDB, ChEMBL, Open Targets"+($("intelMode").value==="identify"?", BLAST ~2 min":"")+")";
+  try{
+    var r=await api("/api/company/run/"+m.pb,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({params:{[m.key]:v}})});
+    intelWatch(r.run_id);
+  }catch(e){$("intelOut").textContent=e.message;}
+}
+async function intelWatch(id){
+  try{
+    var r=await api("/api/company/runs/"+id);
+    if(r.status==="done"&&r.report){$("intelOut").textContent=await (await fetch("/api/company/reports/"+encodeURIComponent(r.report))).text();}
+    else if(r.status==="error"){$("intelOut").textContent="Error: "+((r.summary&&r.summary.error)||"failed");}
+    else{$("intelOut").textContent=(r.log||"Working…");setTimeout(function(){intelWatch(id);},2500);}
+  }catch(e){$("intelOut").textContent=e.message;}
+}
+intelMode();
 
 /* ---- Protein structure (AlphaFold view): pLDDT cartoon + PAE heatmap ---- */
 var STRUCT3D=null;

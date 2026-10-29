@@ -90,6 +90,19 @@ PLAYBOOKS = {p.name: p for p in [
              {"genes": {"type": "text", "default": "STAT1\nIRF1\nCXCL10\nGBP1\nTAP1\nIDO1\nCXCL9"},
               "disease": {"type": "str", "default": ""}},
              pb.deg_interpret),
+    Playbook("target_intel", "Target intelligence", "bio",
+             "Readiness check for a target: is its structure solved (AlphaFold + experimental PDB), "
+             "how drugged/crowded it is (ChEMBL + Open Targets), and a verdict — open space vs crowded. "
+             "The 'is this worth pursuing' answer.",
+             {"target": {"type": "str", "default": "EGFR"}}, pb.target_intel),
+    Playbook("identify_sequence", "Identify sequence", "bio",
+             "A raw protein sequence → what protein is it (blastp vs UniProtKB), and if it's a known "
+             "protein, its full target dossier. The 'what did we just find' lookup.",
+             {"sequence": {"type": "text", "default": ""}}, pb.identify_sequence),
+    Playbook("structure_watch", "Structure watch", "bio",
+             "Re-check a watchlist of targets for newly released experimental structures or drugs and "
+             "diff against the last snapshot. Built to run on a schedule.",
+             {"targets": {"type": "text", "default": "EGFR\nKRAS\nTP53"}}, pb.structure_watch),
     Playbook("bio_target_dossier", "Target dossier", "bio",
              "Ranked candidate targets, known drugs and graph context for a disease (needs Neo4j + PrimeKG).",
              {"disease": {"type": "str", "default": "idiopathic pulmonary fibrosis"}, "top": {"type": "int", "default": 12},
