@@ -95,17 +95,18 @@ def _fetch_pae(pae_url: str):
     return mat, mx
 
 
-def fetch(target: str) -> dict:
-    """Resolve a target to its AlphaFold model: pLDDT-coloured PDB + PAE matrix."""
+def fetch(target: str, organism: str | None = None) -> dict:
+    """Resolve a target to its AlphaFold model: pLDDT-coloured PDB + PAE matrix.
+    `organism` (name or NCBI taxid) pins viral/bacterial targets, e.g. 'SARS-CoV-2'."""
     target = (target or "").strip()
     if not target:
         return {"ok": False, "error": "give a gene symbol or UniProt accession"}
     # resolve to a UniProt accession (accepts an accession directly too)
-    acc, gene = target, None
+    acc, gene, orgname = target, None, None
     if not _ACC.match(target.upper()):
         try:
-            info = resolve_uniprot(target)
-            acc, gene = info["accession"], info.get("gene") or target
+            info = resolve_uniprot(target, organism)
+            acc, gene, orgname = info["accession"], info.get("symbol") or target, info.get("organism")
         except Exception as e:
             return {"ok": False, "error": f"couldn't resolve '{target}' to a protein: {str(e)[:120]}"}
     # structure (cached) + metadata from the AF API
@@ -134,6 +135,7 @@ def fetch(target: str) -> dict:
         "ok": True,
         "target": target,
         "gene": gene,
+        "organism": orgname,
         "uniprot": acc,
         "length": length,
         "mean_plddt": mean_plddt,

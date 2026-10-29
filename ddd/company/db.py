@@ -169,8 +169,16 @@ def schedule_advance(sid, every):
 
 def seed_default_schedules():
     """First start only: give the company a standing rhythm."""
-    if schedules():
+    if not schedules():
+        schedule_add("intel_watchlist_sweep", {"run_rea": True}, "weekly mon 06:00")
+        schedule_add("bench_full_sweep", {}, "weekly sun 03:00")
+        schedule_add("pub_weekly_digest", {}, "weekly mon 08:00")
+    ensure_schedule("structure_watch", {"targets": "EGFR\nKRAS\nTP53"}, "weekly mon 07:00")
+
+
+def ensure_schedule(playbook, params, every):
+    """Idempotently make sure a standing schedule exists for a playbook (adds it
+    once for existing installs; no duplicate if it's already registered)."""
+    if any(s["playbook"] == playbook for s in schedules()):
         return
-    schedule_add("intel_watchlist_sweep", {"run_rea": True}, "weekly mon 06:00")
-    schedule_add("bench_full_sweep", {}, "weekly sun 03:00")
-    schedule_add("pub_weekly_digest", {}, "weekly mon 08:00")
+    schedule_add(playbook, params, every)

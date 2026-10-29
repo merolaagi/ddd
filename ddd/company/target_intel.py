@@ -24,17 +24,20 @@ _WATCH_STATE = COMPANY_DIR / "structure_watch.json"
 
 
 # ---------------------------------------------------------------- gather
-def _gather(target: str, ctx=None) -> dict:
+def _gather(target: str, ctx=None, organism: str | None = None) -> dict:
     log = (ctx.log if ctx else (lambda s: None))
-    out = {"target": target, "gene": None, "uniprot": None,
+    out = {"target": target, "gene": None, "uniprot": None, "organism": None,
            "alphafold": None, "pdb": None, "chembl": None, "known_drugs": None}
-    # identity
+    # identity (any organism: human, viral, bacterial)
     try:
         from ..armory.dock import resolve_uniprot
-        info = resolve_uniprot(target)
+        info = resolve_uniprot(target, organism)
         out["uniprot"] = info["accession"]
         out["gene"] = info.get("symbol") or target
         out["protein"] = info.get("protein")
+        out["organism"] = info.get("organism")
+        if out["organism"]:
+            log(f"identity: {out['gene']} · {out['organism']} · {out['uniprot']}")
     except Exception as e:
         log(f"identity: couldn't resolve to UniProt ({str(e)[:70]})")
     # AlphaFold (predicted structure)
@@ -153,11 +156,13 @@ def dossier(ctx, target: str):
     name = g.get("gene") or target
     lines = [f"# Target intelligence: {name}", ""]
     if g.get("uniprot"):
-        lines.append(f"**Identity** · {g.get('protein') or name} · UniProt `{g['uniprot']}`"
+        lines.append(f"**Identity** · {g.get('protein') or name}"
+                     + (f" · {g['organism']}" if g.get("organism") else "")
+                     + f" · UniProt `{g['uniprot']}`"
                      + (f" · {g['alphafold']['length']} residues" if g.get("alphafold") else ""))
     else:
-        lines.append(f"**Identity** · couldn't resolve `{target}` to a human UniProt entry "
-                     "(viral/bacterial targets may not resolve here).")
+        lines.append(f"**Identity** · couldn't resolve `{target}` to a UniProt entry "
+                     "(try adding the organism, e.g. 'main protease SARS-CoV-2').")
     lines += ["", "## Verdict", "",
               f"- **Crowding: {v['crowding']}** — {v['why']}",
               f"- **Structure:** {v['structure']}",

@@ -1224,7 +1224,7 @@ async function runStruct(){
   try{
     var r=await api("/api/structure?target="+encodeURIComponent(t));
     if(!r.ok){$("structStatus").textContent="Error: "+(r.error||"no structure");return;}
-    $("structStatus").innerHTML="<b>"+esc(r.gene||r.target)+"</b> · UniProt "+esc(r.uniprot)+" · "+r.length+" residues · mean pLDDT <b>"+r.mean_plddt+"</b>";
+    $("structStatus").innerHTML="<b>"+esc(r.gene||r.target)+"</b>"+(r.organism?(" · "+esc(r.organism)):"")+" · UniProt "+esc(r.uniprot)+" · "+r.length+" residues · mean pLDDT <b>"+r.mean_plddt+"</b>";
     $("structWrap").style.display="flex";
     // 3D cartoon coloured by pLDDT (B-factor)
     if(!STRUCT3D){STRUCT3D=$3Dmol.createViewer(document.getElementById("struct3d"),{backgroundColor:"0x0b0f1a"});}

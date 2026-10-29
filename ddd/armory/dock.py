@@ -56,28 +56,93 @@ def _which(name: str) -> str | None:
 
 # ------------------------------------------------------------------ structure
 
-def resolve_uniprot(symbol: str) -> dict:
-    """Gene symbol (human) -> reviewed UniProt accession."""
-    if symbol and len(symbol) == 6 and symbol[0] in "OPQ" and symbol[1].isdigit():
-        return {"accession": symbol, "symbol": symbol, "note": "used as accession"}
-    if symbol and symbol.isalnum() and symbol[0].isalpha() and any(c.isdigit() for c in symbol) and len(symbol) >= 6:
-        # looks like an accession (e.g. P16234) already
-        if symbol[0] in "OPQ" or (symbol[0] in "A" and symbol[1].isdigit()):
-            return {"accession": symbol, "symbol": symbol, "note": "used as accession"}
-    q = f"gene:{symbol} AND organism_id:9606 AND reviewed:true"
-    r = httpx.get(UNIPROT, timeout=30, params={
-        "query": q, "fields": "accession,gene_primary,protein_name", "format": "json", "size": 1})
-    r.raise_for_status()
-    res = r.json().get("results", [])
-    if not res:
-        raise ValueError(f"no reviewed human UniProt entry for gene '{symbol}'")
-    acc = res[0]["primaryAccession"]
-    name = ""
+_UNIPROT_FIELDS = "accession,gene_primary,protein_name,organism_name,organism_id,reviewed"
+
+
+def _parse_uniprot(e: dict) -> dict:
+    acc = e.get("primaryAccession")
+    gene = ""
     try:
-        name = res[0]["proteinDescription"]["recommendedName"]["fullName"]["value"]
+        gene = e["genes"][0]["geneName"]["value"]
     except Exception:
         pass
-    return {"accession": acc, "symbol": symbol, "protein": name}
+    name = ""
+    try:
+        name = e["proteinDescription"]["recommendedName"]["fullName"]["value"]
+    except Exception:
+        try:
+            name = e["proteinDescription"]["submissionNames"][0]["fullName"]["value"]
+        except Exception:
+            pass
+    org, taxid = "", None
+    try:
+        org = e["organism"]["scientificName"]
+        taxid = e["organism"]["taxonId"]
+    except Exception:
+        pass
+    et = (e.get("entryType") or "").lower()
+    reviewed = ("reviewed" in et) and ("unreviewed" not in et)
+    return {"accession": acc, "gene": gene, "symbol": gene or None, "protein": name,
+            "organism": org, "taxid": taxid, "reviewed": reviewed}
+
+
+def _uniprot_search(query: str, size: int = 5) -> list[dict]:
+    r = httpx.get(UNIPROT, timeout=30, params={
+        "query": query, "fields": _UNIPROT_FIELDS, "format": "json", "size": size})
+    r.raise_for_status()
+    return [_parse_uniprot(e) for e in r.json().get("results", [])]
+
+
+def _looks_accession(s: str) -> bool:
+    import re
+    return bool(re.match(r"^[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2}$|^[OPQ][0-9][A-Z0-9]{3}[0-9]$", s.upper()))
+
+
+def resolve_uniprot(symbol: str, organism: str | None = None) -> dict:
+    """Resolve a target to a UniProt accession — any organism (human, viral,
+    bacterial), not just human. Accepts a gene symbol, a protein name, or an
+    accession. For a bare gene symbol with no organism given, a human hit is
+    preferred (backward compatible); otherwise the best match wins. Pass
+    `organism` (name or NCBI taxid) to pin it, e.g. 'SARS-CoV-2' or 2697049."""
+    symbol = (symbol or "").strip()
+    if not symbol:
+        raise ValueError("no target given")
+    if _looks_accession(symbol):
+        return {"accession": symbol.upper(), "symbol": symbol.upper(), "gene": None,
+                "protein": None, "organism": None, "note": "used as accession"}
+    org_clause = ""
+    if organism:
+        org_clause = (f" AND organism_id:{organism}" if str(organism).isdigit()
+                      else f' AND organism_name:"{organism}"')
+    phrase = " " in symbol
+    base = f'protein_name:"{symbol}"' if phrase else f'(gene:{symbol} OR protein_name:{symbol})'
+    attempts = [f"{base}{org_clause} AND reviewed:true",
+                f"{base}{org_clause}",
+                f'"{symbol}"{org_clause} AND reviewed:true',
+                f'"{symbol}"{org_clause}']
+    hits = []
+    for q in attempts:
+        try:
+            hits = _uniprot_search(q)
+        except Exception:
+            hits = []
+        if hits:
+            break
+    if not hits:
+        raise ValueError(f"no UniProt entry for '{symbol}'"
+                         + (f" in organism '{organism}'" if organism else ""))
+    # choose: with no organism hint, prefer a human reviewed hit for a bare gene
+    chosen = hits[0]
+    if not organism:
+        human = [h for h in hits if h.get("taxid") == 9606]
+        if human:
+            # prefer human only when the gene actually matches (keeps EGFR human,
+            # but lets "spike glycoprotein" resolve to the virus)
+            gm = [h for h in human if (h.get("gene") or "").upper() == symbol.upper()]
+            chosen = gm[0] if gm else (human[0] if not phrase else hits[0])
+    out = dict(chosen)
+    out["symbol"] = chosen.get("gene") or symbol
+    return out
 
 
 def fetch_alphafold(acc: str) -> Path:
