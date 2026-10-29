@@ -6,6 +6,7 @@
 <title>ddd Lab</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="/static/vendor/vis-network.min.js"></script>
+<script src="/static/vendor/3Dmol-min.js"></script>
 <style>
 :root{
   --bg:#f1f4f8; --panel:#ffffff; --ink:#15223b; --muted:#5e6b80; --line:#e1e7ef;
@@ -360,13 +361,20 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:
   </section>
   <section class="w12" id="gensec">
     <h2>Generative design <span class="muted" style="font-size:12px;font-weight:400">· our Chemistry42</span></h2>
-    <p class="muted" style="font-size:13px;margin:-4px 0 12px">De-novo molecule design: a graph genetic algorithm evolves novel, drug-like candidates for a target, seeded from its ChEMBL actives (or your own SMILES) and scored by QED + synthesizability + Ro5 + similarity. Reward-guided search over public chemistry — not validated activity.</p>
+    <p class="muted" style="font-size:13px;margin:-4px 0 12px">De-novo molecule design: a graph genetic algorithm evolves novel, drug-like candidates for a target, seeded from its ChEMBL actives (or your own SMILES) and scored by QED + synthesizability + Ro5 + similarity. Click any candidate to generate its real 3D conformer (ETKDG + MMFF). Reward-guided search over public chemistry — not validated activity.</p>
     <div class="row">
       <input id="genTarget" placeholder="target gene — EGFR, BRAF, JAK2" style="flex:0;min-width:200px">
       <input id="genSeeds" placeholder="optional: seed SMILES (comma/newline) — overrides target">
       <button onclick="runGen()">Design molecules</button>
     </div>
-    <pre id="genOut" class="mono" style="max-height:540px">Type a target gene (or paste seed SMILES) and Design. ~15–40s for ChEMBL seeds, then the GA runs locally.</pre>
+    <div id="genStatus" class="muted" style="font-size:13px;margin:6px 0">Type a target gene (or paste seed SMILES) and Design. ~15–40s for ChEMBL seeds, then the GA runs locally.</div>
+    <div id="genWrap" style="display:none;gap:16px;align-items:flex-start;flex-wrap:wrap">
+      <div id="genList" style="flex:1;min-width:300px;max-height:560px;overflow:auto"></div>
+      <div style="flex:0;width:360px">
+        <div id="gen3d" style="width:360px;height:320px;position:relative;border:1px solid var(--line);border-radius:12px;background:var(--panel)"></div>
+        <div id="gen3dInfo" class="muted" style="font-size:12px;margin-top:8px;line-height:1.5">Click a candidate to build its 3D structure.</div>
+      </div>
+    </div>
   </section>
   <section class="w6" id="indexsec">
     <h2>Benchmark Index</h2>
@@ -1102,27 +1110,46 @@ async function repWatch(id){
 }
 repMode();
 
+var GEN3D=null, GEN_CANDS=[];
 async function runGen(){
   var t=$("genTarget").value.trim(), seeds=$("genSeeds").value.trim();
-  if(!t&&!seeds){$("genOut").textContent="Give a target gene or seed SMILES.";return;}
-  $("genOut").textContent="Seeding"+(t?(" from "+t):" from SMILES")+" and evolving candidates …";
+  if(!t&&!seeds){$("genStatus").textContent="Give a target gene or seed SMILES.";return;}
+  $("genStatus").textContent="Seeding"+(t?(" from "+t):" from SMILES")+" and evolving candidates … (ChEMBL seeds ~15–40s, then the GA runs locally)";
+  $("genWrap").style.display="none";
   try{
-    var r=await api("/api/company/run/generative_design",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({params:{target:t,seeds:seeds}})});
-    genWatch(r.run_id);
-  }catch(e){$("genOut").textContent=e.message;}
+    var r=await api("/api/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({target:t,seeds:seeds?seeds.split(/[\n,]/).map(function(x){return x.trim();}).filter(Boolean):null})});
+    if(!r.ok){$("genStatus").textContent="Error: "+(r.error||"generation failed");return;}
+    GEN_CANDS=r.candidates||[];
+    $("genStatus").innerHTML="Evolved <b>"+r.unique_explored+"</b> unique molecules from <b>"+r.seeds+"</b> seed(s) over "+r.generations+" generations · "+(r.seed_meta||[]).join("; ")+". Click a row for its 3D structure.";
+    renderGenList();
+    $("genWrap").style.display="flex";
+  }catch(e){$("genStatus").textContent=e.message;}
 }
-async function genWatch(id){
+function renderGenList(){
+  var h='<table style="width:100%"><tr><th>#</th><th>SMILES</th><th>Score</th><th>QED</th><th>SA</th><th>Sim</th><th>MW</th><th></th></tr>';
+  GEN_CANDS.forEach(function(c,i){
+    h+='<tr id="genrow'+i+'" style="cursor:pointer" onclick="show3d('+i+')">'
+      +'<td>'+c.rank+'</td><td class="mono" style="font-size:11px">'+esc(c.smiles)+'</td>'
+      +'<td><b>'+c.score+'</b></td><td>'+c.qed+'</td><td>'+c.sa+'</td><td>'+c.sim_to_seed+'</td><td>'+c.mol_weight+'</td>'
+      +'<td><button class="small" onclick="event.stopPropagation();show3d('+i+')">3D</button></td></tr>';
+  });
+  $("genList").innerHTML=h+'</table>';
+}
+async function show3d(i){
+  var c=GEN_CANDS[i]; if(!c)return;
+  Array.prototype.forEach.call(document.querySelectorAll('[id^=genrow]'),function(r){r.style.background="";});
+  var row=$("genrow"+i); if(row)row.style.background="var(--accent-soft, rgba(43,74,203,.08))";
+  $("gen3dInfo").textContent="Building 3D conformer …";
   try{
-    var r=await api("/api/company/runs/"+id);
-    if(r.status==="done"&&r.report){
-      $("genOut").textContent=await (await fetch("/api/company/reports/"+encodeURIComponent(r.report))).text();
-    }else if(r.status==="error"){
-      $("genOut").textContent="Error: "+((r.summary&&r.summary.error)||"failed");
-    }else{
-      $("genOut").textContent=(r.log||"Working…");
-      setTimeout(function(){genWatch(id);},2000);
-    }
-  }catch(e){$("genOut").textContent=e.message;}
+    var r=await api("/api/mol3d?smiles="+encodeURIComponent(c.smiles));
+    if(!r.ok){$("gen3dInfo").textContent="Could not embed: "+(r.error||"failed");return;}
+    if(!GEN3D){GEN3D=$3Dmol.createViewer(document.getElementById("gen3d"),{backgroundColor:getComputedStyle(document.body).getPropertyValue('--panel')||'white'});}
+    GEN3D.clear();
+    GEN3D.addModel(r.molblock,"mol");
+    GEN3D.setStyle({},{stick:{radius:0.16},sphere:{scale:0.26}});
+    GEN3D.zoomTo(); GEN3D.render(); GEN3D.spin('y',0.5);
+    $("gen3dInfo").innerHTML="<b>#"+c.rank+"</b> · "+r.heavy_atoms+" heavy atoms · "+r.atoms+" with H · "+(r.forcefield||"no FF")+" energy "+(r.energy!=null?r.energy+" kcal/mol":"—")+"<br>Drag to rotate · scroll to zoom. Shape from ETKDG distance geometry + minimisation; energy is relative within this molecule.";
+  }catch(e){$("gen3dInfo").textContent=e.message;}
 }
 
 </script>

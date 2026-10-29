@@ -29,6 +29,52 @@ from rdkit.Chem import AllChem, Crippen, Descriptors, QED, rdMolDescriptors
 from rdkit.Chem import rdFingerprintGenerator
 from rdkit import DataStructs
 
+
+def embed3d(smiles: str, seed: int = 1, optimize: bool = True) -> dict:
+    """Turn a flat SMILES into a real 3D conformer: ETKDGv3 distance-geometry
+    embedding + MMFF94 minimisation (UFF fallback). Returns an MDL mol block
+    (with explicit H) ready for a 3D viewer, plus the force-field energy.
+
+    This is the geometry rung of generative design — the molecule's actual
+    shape, not a 2D depiction. Conformer energy is a relative stability signal
+    within one molecule, not a cross-molecule binding score.
+    """
+    m = Chem.MolFromSmiles(str(smiles))
+    if m is None:
+        return {"ok": False, "error": "invalid SMILES", "smiles": smiles}
+    mh = Chem.AddHs(m)
+    params = AllChem.ETKDGv3()
+    params.randomSeed = int(seed)
+    cid = AllChem.EmbedMolecule(mh, params)
+    if cid < 0:  # retry with random coords for strained systems
+        params.useRandomCoords = True
+        cid = AllChem.EmbedMolecule(mh, params)
+    if cid < 0:
+        return {"ok": False, "error": "could not embed a 3D conformer", "smiles": smiles}
+    energy, ff_used = None, None
+    if optimize:
+        try:
+            if AllChem.MMFFHasAllMoleculeParams(mh):
+                AllChem.MMFFOptimizeMolecule(mh)
+                props = AllChem.MMFFGetMoleculeProperties(mh)
+                ff = AllChem.MMFFGetMoleculeForceField(mh, props)
+                energy, ff_used = (round(ff.CalcEnergy(), 2) if ff else None), "MMFF94"
+            else:
+                AllChem.UFFOptimizeMolecule(mh)
+                ff = AllChem.UFFGetMoleculeForceField(mh)
+                energy, ff_used = (round(ff.CalcEnergy(), 2) if ff else None), "UFF"
+        except Exception:
+            ff_used = None
+    return {
+        "ok": True,
+        "smiles": Chem.MolToSmiles(m),
+        "molblock": Chem.MolToMolBlock(mh),
+        "energy": energy,
+        "forcefield": ff_used,
+        "atoms": mh.GetNumAtoms(),
+        "heavy_atoms": m.GetNumHeavyAtoms(),
+    }
+
 RDLogger.DisableLog("rdApp.*")
 
 _GEN = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=2048)

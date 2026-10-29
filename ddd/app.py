@@ -260,6 +260,20 @@ def api_generate(req: GenerateReq):
         raise HTTPException(500, f"generate: {str(e)[:200]}")
 
 
+@app.get("/api/mol3d")
+def api_mol3d(smiles: str, seed: int = 1):
+    from . import generate as gen
+    try:
+        r = gen.embed3d(smiles, seed=seed)
+        if not r.get("ok"):
+            raise HTTPException(422, r.get("error", "embed failed"))
+        return r
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"mol3d: {str(e)[:200]}")
+
+
 @app.post("/api/analyst")
 def analyst(req: AnalystReq):
     from . import analyst as an

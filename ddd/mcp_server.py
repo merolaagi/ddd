@@ -87,6 +87,17 @@ def generate_molecules(target: str = "", seeds: list[str] | None = None,
 
 
 @mcp.tool()
+def molecule_3d(smiles: str, seed: int = 1) -> dict:
+    """Generate a real 3D conformer for a molecule: ETKDGv3 distance-geometry
+    embedding + MMFF94 minimisation (UFF fallback). Returns an MDL mol block with
+    explicit hydrogens and the force-field energy — the molecule's actual shape,
+    ready for a 3D viewer or docking. Energy is relative within one molecule, not
+    a binding score."""
+    from . import generate as _gen
+    return _gen.embed3d(smiles, seed=seed)
+
+
+@mcp.tool()
 async def run_benchmark(task: str, model: str = "rf", sample: int | None = None) -> dict:
     """Train/evaluate a model on a task's held-out scaffold split and record the score.
     model: 'rf', 'logreg' or 'ollama:<name>'. sample limits LLM test molecules (default 100)."""
