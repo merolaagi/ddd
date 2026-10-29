@@ -183,7 +183,7 @@ function render(bot,r,q){
   if(r.kind==="clarify"){LAST_CLARIFY={pending:r.pending,q:q};
     el.innerHTML=mdInline(r.say)+'<div class="opts">'+r.options.map(o=>'<button class="opt" onclick="choose(\''+o.value.replace(/'/g,"\\'")+'\')">'+esc(o.label)+'</button>').join("")+'</div>';toBottom();return;}
   if(r.kind==="answer"){el.innerHTML=mdInline(r.say);toBottom();return;}
-  if(r.kind==="ui"){el.innerHTML=mdInline(r.say)+planHtml(r.plan)+'<p class="muted" style="margin-top:8px">Open it in the <a href="/lab">Lab</a> to see the '+(r.ui.action==="cell"?"living cell":"graph")+'.</p>';toBottom();return;}
+  if(r.kind==="ui"){var what=r.ui.action==="cell"?"living cell":(r.ui.action==="structure"?"AlphaFold structure":"graph");el.innerHTML=mdInline(r.say)+planHtml(r.plan)+'<p class="muted" style="margin-top:8px">Open it in the <a href="/lab">Lab</a> to see the '+what+'.</p>';toBottom();return;}
   if(r.kind==="data"){var d=r.result.data,html=mdInline(r.say)+planHtml(r.plan);
     if(r.result.type==="predict"){html+='<table class="rtab"><tr><th>#</th><th>Gene</th><th>AA</th><th>drugs</th></tr>'+(d.predictions||[]).slice(0,10).map((p,i)=>'<tr><td>'+(i+1)+'</td><td><b>'+esc(p.name)+'</b></td><td>'+p.adamic_adar+'</td><td>'+(p.known_drugs||0)+'</td></tr>').join("")+'</table>';}
     else if(r.result.type==="hypothesis"){html+='<p style="margin:8px 0 0"><b>'+esc(d.plausibility)+'</b> — '+esc(d.reading)+' <span class="muted">(common '+d.scores.common_neighbors+', Adamic-Adar '+d.scores.adamic_adar+', hops '+(d.path_hops||"—")+')</span></p>';}

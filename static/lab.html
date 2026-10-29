@@ -359,6 +359,31 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:
     </div>
     <pre id="repOut" class="mono" style="max-height:540px">Pick a mode, type a disease / virus / bacterium, and Run.</pre>
   </section>
+  <section class="w12" id="structsec">
+    <h2>Protein structure <span class="muted" style="font-size:12px;font-weight:400">· AlphaFold view</span></h2>
+    <p class="muted" style="font-size:13px;margin:-4px 0 12px">The AlphaFold view of a target: its precomputed AlphaFold DB structure, coloured by per-residue confidence (pLDDT), next to the predicted aligned error (PAE) map — the same two panels the AlphaFold viewer shows. Fetches a known protein's existing prediction (not a de-novo fold of a new sequence).</p>
+    <div class="row">
+      <input id="structTarget" placeholder="target gene or UniProt — EGFR, BRAF, P00533" style="flex:0;min-width:240px">
+      <button onclick="runStruct()">Fetch structure</button>
+    </div>
+    <div id="structStatus" class="muted" style="font-size:13px;margin:6px 0">Type a target and fetch its AlphaFold structure + PAE.</div>
+    <div id="structWrap" style="display:none;gap:18px;align-items:flex-start;flex-wrap:wrap">
+      <div style="flex:1;min-width:320px">
+        <div id="struct3d" style="width:100%;height:380px;position:relative;border:1px solid var(--line);border-radius:12px;background:#0b0f1a"></div>
+        <div id="plddtLegend" style="display:flex;gap:14px;flex-wrap:wrap;font-size:12px;margin-top:8px">
+          <span><b style="color:#0053D6">■</b> Very high (&ge;90)</span>
+          <span><b style="color:#65CBF3">■</b> Confident (70–90)</span>
+          <span><b style="color:#FFDB13">■</b> Low (50–70)</span>
+          <span><b style="color:#FF7D45">■</b> Very low (&lt;50)</span>
+        </div>
+      </div>
+      <div style="flex:0;width:360px">
+        <canvas id="paeCanvas" width="320" height="320" style="width:320px;height:320px;border:1px solid var(--line);border-radius:10px;background:var(--panel)"></canvas>
+        <div id="paeAxis" class="muted" style="font-size:11px;margin-top:4px;text-align:center">Predicted Aligned Error — scored residue (x) vs aligned residue (y)</div>
+        <div id="structInfo" class="muted" style="font-size:12px;margin-top:10px;line-height:1.55"></div>
+      </div>
+    </div>
+  </section>
   <section class="w12" id="gensec">
     <h2>Generative design <span class="muted" style="font-size:12px;font-weight:400">· our Chemistry42</span></h2>
     <p class="muted" style="font-size:13px;margin:-4px 0 12px">De-novo molecule design: a graph genetic algorithm evolves novel, drug-like candidates for a target, seeded from its ChEMBL actives (or your own SMILES) and scored by QED + synthesizability + Ro5 + similarity. Click any candidate to generate its real 3D conformer (ETKDG + MMFF). Reward-guided search over public chemistry — not validated activity.</p>
@@ -1152,6 +1177,46 @@ async function show3d(i){
   }catch(e){$("gen3dInfo").textContent=e.message;}
 }
 
+/* ---- Protein structure (AlphaFold view): pLDDT cartoon + PAE heatmap ---- */
+var STRUCT3D=null;
+function plddtColor(b){ return b>=90?0x0053D6: b>=70?0x65CBF3: b>=50?0xFFDB13:0xFF7D45; }
+async function runStruct(){
+  var t=$("structTarget").value.trim(); if(!t){$("structStatus").textContent="Give a target gene or UniProt accession.";return;}
+  $("structStatus").textContent="Resolving "+t+" → UniProt, fetching AlphaFold model + PAE … (first fetch ~5–20s)";
+  $("structWrap").style.display="none";
+  try{
+    var r=await api("/api/structure?target="+encodeURIComponent(t));
+    if(!r.ok){$("structStatus").textContent="Error: "+(r.error||"no structure");return;}
+    $("structStatus").innerHTML="<b>"+esc(r.gene||r.target)+"</b> · UniProt "+esc(r.uniprot)+" · "+r.length+" residues · mean pLDDT <b>"+r.mean_plddt+"</b>";
+    $("structWrap").style.display="flex";
+    // 3D cartoon coloured by pLDDT (B-factor)
+    if(!STRUCT3D){STRUCT3D=$3Dmol.createViewer(document.getElementById("struct3d"),{backgroundColor:"0x0b0f1a"});}
+    STRUCT3D.clear();
+    STRUCT3D.addModel(r.pdb,"pdb");
+    STRUCT3D.setStyle({},{cartoon:{colorfunc:function(atom){return plddtColor(atom.b);}}});
+    STRUCT3D.zoomTo(); STRUCT3D.render(); STRUCT3D.spin("y",0.4);
+    // PAE heatmap
+    drawPAE(r.pae, r.pae_max);
+    var b=r.plddt_bands||{};
+    $("structInfo").innerHTML="Confidence bands — very high "+b.very_high+"%, confident "+b.confident+"%, low "+b.low+"%, very low "+b.very_low+"%."
+      +"<br>PAE max "+(r.pae_max!=null?(Math.round(r.pae_max)+" Å"):"—")+(r.pae_stride>1?(" · shown at 1/"+r.pae_stride+" resolution"):"")
+      +'<br><a href="'+r.source+'" target="_blank">AlphaFold DB entry →</a> · precomputed model (CC-BY 4.0), not a de-novo fold.';
+  }catch(e){$("structStatus").textContent=e.message;}
+}
+function drawPAE(mat, mx){
+  var cv=document.getElementById("paeCanvas"), ctx=cv.getContext("2d");
+  ctx.clearRect(0,0,cv.width,cv.height);
+  if(!mat||!mat.length){ctx.fillStyle="#888";ctx.fillText("No PAE available",110,160);return;}
+  var n=mat.length, max=mx||30, cell=cv.width/n;
+  for(var i=0;i<n;i++){for(var j=0;j<n;j++){
+    var v=mat[i][j], t=Math.max(0,Math.min(1,v/max));  // 0=low error(good) 1=high
+    // dark green (#00441b) -> white, matching the AlphaFold PAE colourbar
+    var R=Math.round(0+t*255), G=Math.round(68+t*(255-68)), B=Math.round(27+t*(255-27));
+    ctx.fillStyle="rgb("+R+","+G+","+B+")";
+    ctx.fillRect(j*cell,i*cell,Math.ceil(cell),Math.ceil(cell));
+  }}
+}
+
 </script>
 <script>
 
@@ -1246,6 +1311,7 @@ function renderAnalyst(r,q){
     chatAdd("bot",mdB(r.say)+planHtml(r.plan));
     if(r.ui.action==="cell"&&typeof loadCell==="function"){document.getElementById("cellDis").value=r.ui.entity;loadCell();document.getElementById("cellsec").scrollIntoView({behavior:"smooth"});}
     else if(r.ui.action==="graph"&&typeof kgViz==="function"){document.getElementById("kgq").value=r.ui.entity;kgViz();document.getElementById("kgsec").scrollIntoView({behavior:"smooth"});}
+    else if(r.ui.action==="structure"&&typeof runStruct==="function"){document.getElementById("structTarget").value=r.ui.entity;runStruct();document.getElementById("structsec").scrollIntoView({behavior:"smooth"});}
     return;
   }
   if(r.kind==="data"){

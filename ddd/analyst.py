@@ -181,6 +181,14 @@ def handle(q: str, choice: str | None = None, pending: dict | None = None) -> di
         except Exception as e:
             return {"kind": "answer", "say": f"Graph unavailable: {str(e)[:140]}"}
 
+    # ---- protein structure (AlphaFold view) ----
+    if re.search(r"\b(structure|alphafold|alpha ?fold|fold|3d structure|ribbon|cartoon|pae|crystal structure)\b", ql) \
+            and re.search(r"\b(structure|alphafold|alpha ?fold|fold|protein|ribbon|cartoon|pae)\b", ql):
+        ent = _tail(q)
+        return {"kind": "ui", "say": f"Fetching the AlphaFold structure for **{ent}**.",
+                "plan": ["Resolve target → UniProt", "Fetch AlphaFold model + PAE", "Render pLDDT ribbon + error map"],
+                "ui": {"action": "structure", "entity": ent}}
+
     # ---- build the cell ----
     if re.search(r"build (a |the )?cell|show (the )?cell|virtual cell|cell (for|of)", ql):
         ent = _tail(q)

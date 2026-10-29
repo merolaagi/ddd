@@ -274,6 +274,20 @@ def api_mol3d(smiles: str, seed: int = 1):
         raise HTTPException(500, f"mol3d: {str(e)[:200]}")
 
 
+@app.get("/api/structure")
+def api_structure(target: str):
+    from .sources import structure
+    try:
+        r = structure.fetch(target)
+        if not r.get("ok"):
+            raise HTTPException(422, r.get("error", "no structure"))
+        return r
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(502, f"structure: {str(e)[:200]}")
+
+
 @app.post("/api/analyst")
 def analyst(req: AnalystReq):
     from . import analyst as an

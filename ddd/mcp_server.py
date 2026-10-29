@@ -98,6 +98,26 @@ def molecule_3d(smiles: str, seed: int = 1) -> dict:
 
 
 @mcp.tool()
+def protein_structure(target: str) -> dict:
+    """Fetch a target's AlphaFold structure and PAE (the AlphaFold view). Resolves a
+    gene symbol (or UniProt accession) to its precomputed AlphaFold DB model and
+    returns the pLDDT-coloured PDB, mean pLDDT, confidence bands and the predicted
+    aligned error matrix. Shows AlphaFold's existing prediction for a known protein —
+    not a de-novo fold of a novel sequence. The PDB text can be large."""
+    from .sources import structure
+    r = structure.fetch(target)
+    # keep the MCP payload lean: drop the full PDB text, keep the summary + PAE shape
+    if r.get("ok"):
+        r = dict(r)
+        r["pdb_lines"] = len(r.get("pdb", "").splitlines())
+        r.pop("pdb", None)
+        if r.get("pae"):
+            r["pae_shape"] = f"{len(r['pae'])}x{len(r['pae'][0])} (stride {r.get('pae_stride',1)})"
+            r.pop("pae", None)
+    return r
+
+
+@mcp.tool()
 async def run_benchmark(task: str, model: str = "rf", sample: int | None = None) -> dict:
     """Train/evaluate a model on a task's held-out scaffold split and record the score.
     model: 'rf', 'logreg' or 'ollama:<name>'. sample limits LLM test molecules (default 100)."""
