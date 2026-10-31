@@ -122,6 +122,19 @@ class _NullCtx:
 
 
 @mcp.tool()
+def discovery_mission(disease: str, max_targets_try: int = 4, want: int = 1, dock: bool = False) -> dict:
+    """Run the whole pipeline with agents in tandem until something useful turns up: read the
+    literature → scout each target's readiness → design novel drug-like analogs, looping over
+    targets until a candidate clears the bar (QED ≥ 0.5, no Lipinski violation). Returns the
+    lead target(s), the candidates that cleared the bar, and the trail of what was tried.
+    Prioritisation from public data + reward-guided design, not a validated lead."""
+    from .company import mission
+    summary, lines = mission.run(_NullCtx(), disease, max_targets_try=max_targets_try,
+                                 want=want, dock=dock)
+    return {"ok": True, "summary": summary, "markdown": "\n".join(lines)}
+
+
+@mcp.tool()
 def literature_discovery(disease: str, design: bool = False, max_papers: int = 20) -> dict:
     """Agents read the research and return molecules. Reads the most-cited papers for a
     condition (Europe PMC), text-mines the genes/proteins and chemicals they discuss,

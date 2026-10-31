@@ -90,6 +90,17 @@ PLAYBOOKS = {p.name: p for p in [
              {"genes": {"type": "text", "default": "STAT1\nIRF1\nCXCL10\nGBP1\nTAP1\nIDO1\nCXCL9"},
               "disease": {"type": "str", "default": ""}},
              pb.deg_interpret),
+    Playbook("discovery_mission", "Discovery mission", "bio",
+             "Agents in tandem: read the literature → scout each target (readiness) → design novel "
+             "drug-like analogs, looping over targets until a candidate clears the bar (QED ≥ 0.5, no "
+             "Lipinski violation). Runs the whole pipeline end to end until something useful turns up. "
+             "Prioritisation, not a validated lead.",
+             {"disease": {"type": "str", "default": "idiopathic pulmonary fibrosis"},
+              "max_targets_try": {"type": "int", "default": 4},
+              "want": {"type": "int", "default": 1},
+              "design_n": {"type": "int", "default": 10},
+              "dock": {"type": "bool", "default": False}},
+             pb.discovery_mission),
     Playbook("literature_discovery", "Literature discovery", "bio",
              "Read the most-cited papers for a condition (Europe PMC), text-mine the targets and "
              "chemicals they discuss, rank targets by evidence, and return their drug-like ChEMBL "

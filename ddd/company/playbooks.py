@@ -384,6 +384,15 @@ def literature_discovery(ctx, disease: str = "", max_papers: int = 20,
                        max_compounds=int(max_compounds), design=bool(design))
 
 
+def discovery_mission(ctx, disease: str = "", max_targets_try: int = 4, want: int = 1,
+                      design_n: int = 10, dock: bool = False):
+    """Agents in tandem: read → scout → design, looping over targets until a drug-like
+    candidate clears the bar."""
+    from . import mission
+    return mission.run(ctx, disease, max_targets_try=int(max_targets_try), want=int(want),
+                       design_n=int(design_n), dock=bool(dock))
+
+
 # ---------------------------------------------------------------- Publishing
 
 _GH_CACHE = COMPANY_DIR / "github_cache.json"

@@ -103,6 +103,20 @@ def handle(q: str, choice: str | None = None, pending: dict | None = None) -> di
                       ["Pull target ranking", "Stage experiments", "List CROs & draft outreach", "Set milestones & gates"],
                       f"Drafting a **{mod}** program plan for **{ent}**.")
 
+    # ---- discovery mission (agents in tandem, loop until useful) ----
+    if re.search(r"\b(in tandem|work together|pipeline|end[- ]to[- ]end|full (pipeline|loop|run)|"
+                 r"keep going until|until (we|you).{0,20}(find|discover)|mission|autopilot|"
+                 r"discover (a|some)? ?(drug|candidate|lead|molecule|treatment)|find (me )?a (drug|candidate|lead|cure|treatment))\b", ql) \
+            and not re.search(r"\bprogram plan\b", ql):
+        ent = _tail(q)
+        dock = bool(re.search(r"\bdock", ql))
+        return _start("discovery_mission", {"disease": ent, "dock": dock},
+                      ["Agent 1 · Reader — read the literature",
+                       "Agent 2 · Scout — target readiness",
+                       "Agent 3 · Designer — novel drug-like analogs",
+                       "Loop targets until a candidate clears the bar"],
+                      f"Running the discovery mission for **{ent}** — agents working in tandem until a lead turns up.")
+
     # ---- literature-driven discovery (read research -> molecules) ----
     if re.search(r"\b(read|mine|scan|go through|digest)\b.{0,30}\b(research|literature|papers?|pubmed)\b", ql) \
             or re.search(r"\b(molecules?|compounds?|drug candidates?|candidates?|targets?)\b.{0,25}\bfrom\b.{0,15}\b(research|literature|papers?)\b", ql) \
