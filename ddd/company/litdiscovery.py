@@ -178,10 +178,12 @@ def discover(ctx, disease: str, max_papers: int = 20, max_targets: int = 6,
 
     lead = targets[0]["gene"] if targets else None
     lines += ["", "## Next step", "",
-              f"- **Design novel analogs:** run generative design on **{lead}** "
-              f"(it seeds from these actives and evolves new drug-like molecules).",
-              f"- **Check crowding:** run target intelligence on **{lead}** to see if it's open space.",
-              f"- **Go to protein:** fetch the AlphaFold structure of **{lead}** to set up docking."]
+              f"- **Keep going automatically:** this was the *reading* step. Run the **Discovery mission** "
+              f"on *{disease}* and the agents continue in tandem — scouting each target and designing "
+              f"novel analogs — looping until a candidate clears the bar. (Lab → Discovery mission, or ask "
+              f"chat: *\"find me a drug for {disease}\"*.)",
+              f"- **Or step through manually:** generative design on **{lead}**, target intelligence on "
+              f"**{lead}**, or its AlphaFold structure to set up docking."]
 
     summary = {"disease": name, "papers_read": len(papers), "targets": [t["gene"] for t in targets],
                "candidates": len(rows), "druglike": druglike, "lead_target": lead}
