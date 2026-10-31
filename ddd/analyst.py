@@ -103,6 +103,18 @@ def handle(q: str, choice: str | None = None, pending: dict | None = None) -> di
                       ["Pull target ranking", "Stage experiments", "List CROs & draft outreach", "Set milestones & gates"],
                       f"Drafting a **{mod}** program plan for **{ent}**.")
 
+    # ---- literature-driven discovery (read research -> molecules) ----
+    if re.search(r"\b(read|mine|scan|go through|digest)\b.{0,30}\b(research|literature|papers?|pubmed)\b", ql) \
+            or re.search(r"\b(molecules?|compounds?|drug candidates?|candidates?|targets?)\b.{0,25}\bfrom\b.{0,15}\b(research|literature|papers?)\b", ql) \
+            or re.search(r"\b(literature|research)[- ]?(driven|based)\b.{0,20}\b(discovery|molecule|drug|candidate)", ql) \
+            or re.search(r"what (molecules?|drugs?|compounds?|targets?) does the (research|literature) (suggest|point|say)", ql):
+        ent = _tail(q)
+        design = bool(re.search(r"\b(design|novel|new) (molecule|compound|analog)", ql))
+        return _start("literature_discovery", {"disease": ent, "design": design},
+                      ["Pull most-cited papers (Europe PMC)", "Text-mine targets & chemicals",
+                       "Rank targets by evidence", "Pull drug-like actives" + (" + design analogs" if design else "")],
+                      f"Reading the research on **{ent}** to surface drug-like candidates.")
+
     # ---- literature ----
     if re.search(r"literature|papers?|publications?|what'?s known about|pubmed|studies on|evidence (for|on)", ql):
         ent = _tail(q)

@@ -122,6 +122,19 @@ class _NullCtx:
 
 
 @mcp.tool()
+def literature_discovery(disease: str, design: bool = False, max_papers: int = 20) -> dict:
+    """Agents read the research and return molecules. Reads the most-cited papers for a
+    condition (Europe PMC), text-mines the genes/proteins and chemicals they discuss,
+    ranks targets by evidence, and returns those targets' drug-like ChEMBL actives as
+    candidate molecules — 'as close to a drug' as public assay data offers. With
+    design=True it also evolves novel analogs for the lead target. Evidence + public
+    assays, not a validated hit list."""
+    from .company import litdiscovery as ld
+    summary, lines = ld.discover(_NullCtx(), disease, max_papers=min(max_papers, 25), design=design)
+    return {"ok": True, "summary": summary, "markdown": "\n".join(lines)}
+
+
+@mcp.tool()
 def target_intel(target: str) -> dict:
     """Target readiness dossier: is this target already solved/drugged, or open space?
     Combines identity (UniProt), structure (AlphaFold + experimental PDB), and

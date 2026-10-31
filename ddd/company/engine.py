@@ -90,6 +90,17 @@ PLAYBOOKS = {p.name: p for p in [
              {"genes": {"type": "text", "default": "STAT1\nIRF1\nCXCL10\nGBP1\nTAP1\nIDO1\nCXCL9"},
               "disease": {"type": "str", "default": ""}},
              pb.deg_interpret),
+    Playbook("literature_discovery", "Literature discovery", "bio",
+             "Read the most-cited papers for a condition (Europe PMC), text-mine the targets and "
+             "chemicals they discuss, rank targets by evidence, and return their drug-like ChEMBL "
+             "actives as candidate molecules — optionally designing novel analogs for the lead target. "
+             "Evidence + public assays, not a validated hit list.",
+             {"disease": {"type": "str", "default": "idiopathic pulmonary fibrosis"},
+              "max_papers": {"type": "int", "default": 20},
+              "max_targets": {"type": "int", "default": 6},
+              "max_compounds": {"type": "int", "default": 15},
+              "design": {"type": "bool", "default": False}},
+             pb.literature_discovery),
     Playbook("target_intel", "Target intelligence", "bio",
              "Readiness check for a target: is its structure solved (AlphaFold + experimental PDB), "
              "how drugged/crowded it is (ChEMBL + Open Targets), and a verdict — open space vs crowded. "

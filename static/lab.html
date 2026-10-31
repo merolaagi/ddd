@@ -359,6 +359,16 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:
     </div>
     <pre id="repOut" class="mono" style="max-height:540px">Pick a mode, type a disease / virus / bacterium, and Run.</pre>
   </section>
+  <section class="w12" id="litsec">
+    <h2>Literature discovery <span class="muted" style="font-size:12px;font-weight:400">· agents read the research</span></h2>
+    <p class="muted" style="font-size:13px;margin:-4px 0 12px">Point ddd at a condition. It reads the most-cited papers (Europe PMC), text-mines the targets and chemicals they discuss, ranks targets by how many papers back them, and returns those targets' drug-like ChEMBL actives — real molecules, many clinical, as close to a drug as public data offers. Tick "design analogs" to also evolve novel molecules for the lead target.</p>
+    <div class="row">
+      <input id="litDisease" placeholder="disease or condition — idiopathic pulmonary fibrosis, ALS, type 2 diabetes" style="flex:1;min-width:280px">
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;white-space:nowrap"><input type="checkbox" id="litDesign" style="width:auto"> design analogs</label>
+      <button onclick="runLit()">Read &amp; discover</button>
+    </div>
+    <pre id="litOut" class="mono" style="max-height:620px">Type a condition and run. The agent reads ~20 papers, extracts targets, and pulls drug-like candidate molecules (~30–90s with the external lookups).</pre>
+  </section>
   <section class="w12" id="intelsec">
     <h2>Target intelligence <span class="muted" style="font-size:12px;font-weight:400">· is it worth pursuing?</span></h2>
     <p class="muted" style="font-size:13px;margin:-4px 0 12px">Before committing design effort: is a target already solved (AlphaFold + experimental PDB) and drugged (ChEMBL + Open Targets), or is it open space? Identify a raw sequence ddd found, or watch a list of targets for newly released structures.</p>
@@ -1189,6 +1199,25 @@ async function show3d(i){
     GEN3D.zoomTo(); GEN3D.render(); GEN3D.spin('y',0.5);
     $("gen3dInfo").innerHTML="<b>#"+c.rank+"</b> · "+r.heavy_atoms+" heavy atoms · "+r.atoms+" with H · "+(r.forcefield||"no FF")+" energy "+(r.energy!=null?r.energy+" kcal/mol":"—")+"<br>Drag to rotate · scroll to zoom. Shape from ETKDG distance geometry + minimisation; energy is relative within this molecule.";
   }catch(e){$("gen3dInfo").textContent=e.message;}
+}
+
+/* ---- Literature discovery: read research -> drug-like molecules (async run) ---- */
+async function runLit(){
+  var d=$("litDisease").value.trim(); if(!d){$("litOut").textContent="Enter a disease or condition.";return;}
+  var design=$("litDesign").checked;
+  $("litOut").textContent="Reading the literature on "+d+" … (Europe PMC search + text-mining + ChEMBL"+(design?" + generative design":"")+")";
+  try{
+    var r=await api("/api/company/run/literature_discovery",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({params:{disease:d,design:design}})});
+    litWatch(r.run_id);
+  }catch(e){$("litOut").textContent=e.message;}
+}
+async function litWatch(id){
+  try{
+    var r=await api("/api/company/runs/"+id);
+    if(r.status==="done"&&r.report){$("litOut").textContent=await (await fetch("/api/company/reports/"+encodeURIComponent(r.report))).text();}
+    else if(r.status==="error"){$("litOut").textContent="Error: "+((r.summary&&r.summary.error)||"failed");}
+    else{$("litOut").textContent=(r.log||"Working…");setTimeout(function(){litWatch(id);},2500);}
+  }catch(e){$("litOut").textContent=e.message;}
 }
 
 /* ---- Target intelligence: readiness / identify / watch (async company run) ---- */

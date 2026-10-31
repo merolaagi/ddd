@@ -376,6 +376,14 @@ def structure_watch(ctx, targets: str = ""):
     return ti.watch(ctx, targets)
 
 
+def literature_discovery(ctx, disease: str = "", max_papers: int = 20,
+                         max_targets: int = 6, max_compounds: int = 15, design: bool = False):
+    """Read the literature for a condition and return evidence-backed, drug-like molecules."""
+    from . import litdiscovery as ld
+    return ld.discover(ctx, disease, max_papers=int(max_papers), max_targets=int(max_targets),
+                       max_compounds=int(max_compounds), design=bool(design))
+
+
 # ---------------------------------------------------------------- Publishing
 
 _GH_CACHE = COMPANY_DIR / "github_cache.json"
