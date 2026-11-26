@@ -88,6 +88,11 @@ def annotate(papers: list, types: tuple = _TYPES) -> dict:
                  "uri": v.get("uri")} for k, v in d.items()]
         return sorted(rows, key=lambda x: (x["papers"], x["mentions"]), reverse=True)
 
-    return {"gene_proteins": rank(agg.get("Gene_Proteins", {})),
-            "chemicals": rank(agg.get("Chemicals", {})),
-            "papers_read": len(ided)}
+    # keys: Gene_Proteins->gene_proteins, Chemicals->chemicals, Diseases->diseases, …
+    keymap = {"Gene_Proteins": "gene_proteins", "Chemicals": "chemicals", "Diseases": "diseases"}
+    out = {"papers_read": len(ided)}
+    for t in types:
+        out[keymap.get(t, t.lower())] = rank(agg.get(t, {}))
+    out.setdefault("gene_proteins", [])
+    out.setdefault("chemicals", [])
+    return out

@@ -1,11 +1,15 @@
 """Swarm supervisor — a self-running research company.
 
 Worker agents (the department playbooks) grind on the focus diseases on their
-own. A supervisor loop (`tick`) keeps them busy, harvests their results, judges
-each against a tunable bar, escalates what's worthy to the founder (an HQ inbox
-+ email), and when a worker comes up short it spawns a new specialist agent on
-the fly to attack the gap. Driven by a schedule, so it is always working while
-the server is up (and launchd keeps the server up).
+own, and — when the queue has room — the supervisor goes *out into the world*:
+a world scout reads recent literature, text-mines fresh diseases and targets out
+of the papers, and feeds them into the queue, so the swarm keeps discovering new
+things to work on instead of recycling a fixed list. A supervisor loop (`tick`)
+keeps them busy, harvests their results, judges each against a tunable bar,
+escalates what's worthy to the founder (an HQ inbox + email), and when a worker
+comes up short it spawns a new specialist agent on the fly to attack the gap.
+Driven by a schedule, so it is always working while the server is up (and
+launchd keeps the server up).
 
 Design: dispatch-and-harvest, non-blocking. Each tick harvests the runs that
 finished since last time (score → escalate → spawn), tops the queue back up,
@@ -39,14 +43,19 @@ _DEFAULT_CFG = {
     "escalate_findings": True,
     "email_alerts": True,
     "baseline_worker": "discovery_mission",
+    "explore_world": True,      # go beyond focus_diseases: mine fresh topics from papers
+    "world_batch": 3,           # fresh diseases to pick up per world scout
+    "max_world_topics": 300,    # cap on remembered discovered topics
 }
 
 
 # ---------------------------------------------------------------- state
 def _blank():
-    return {"queue": [], "dynamic_agents": [], "escalations": [],
+    return {"queue": [], "dynamic_agents": [], "escalations": [], "discovered": [],
+            "world_cursor": 0,
             "stats": {"ticks": 0, "dispatched": 0, "harvested": 0, "leads": 0,
-                      "findings": 0, "agents_spawned": 0, "errors": 0, "last_tick": None},
+                      "findings": 0, "agents_spawned": 0, "errors": 0, "last_tick": None,
+                      "world_scouts": 0, "world_topics": 0},
             "seq": 0}
 
 
@@ -68,6 +77,10 @@ def _save(s):
     live = [t for t in s["queue"] if t["status"] in ("pending", "running")]
     s["queue"] = live + done[-60:]
     s["escalations"] = s["escalations"][-120:]
+    # keep unworked topics, trim the worked tail
+    unworked = [d for d in s.get("discovered", []) if not d.get("worked")]
+    worked = [d for d in s.get("discovered", []) if d.get("worked")]
+    s["discovered"] = (unworked + worked[-240:])[-300:]
     try:
         _STATE.write_text(json.dumps(s, indent=1))
     except Exception:
@@ -251,6 +264,36 @@ def _spawn(s, spec, cfg, ctx):
     return True
 
 
+# ---------------------------------------------------------------- world scout
+def _scout(s, cfg, ctx):
+    """Go out into recent literature and pick up fresh diseases + targets to work on.
+    Appends new topics to s['discovered']; returns the list of (kind, name) added."""
+    from . import litdiscovery as ld
+    cur = int(s.get("world_cursor", 0))
+    known = {d["name"].lower() for d in s.get("discovered", [])}
+    known |= {str(x).lower() for x in charter_mod.load().get("focus_diseases", [])}
+    res = ld.scout_world(cursor=cur, want=int(cfg.get("world_batch", 3)), exclude=known)
+    s["world_cursor"] = cur + 1
+    s["stats"]["world_scouts"] = s["stats"].get("world_scouts", 0) + 1
+    added = []
+    for nm in res.get("diseases", []):
+        s["discovered"].append({"name": nm, "kind": "disease", "worked": False,
+                                "source": res.get("query"), "added": time.time()})
+        added.append(("disease", nm))
+    for nm in (res.get("targets") or [])[:2]:
+        s["discovered"].append({"name": nm, "kind": "target", "worked": False,
+                                "source": res.get("query"), "added": time.time()})
+        added.append(("target", nm))
+    s["stats"]["world_topics"] = s["stats"].get("world_topics", 0) + len(added)
+    if ctx:
+        if added:
+            ctx.log("🌐 world scout — picked up " + ", ".join(f"{k}:{n}" for k, n in added)
+                    + f" (from {res.get('papers', 0)} recent papers)")
+        else:
+            ctx.log(f"🌐 world scout — no new topics this pass ({res.get('papers', 0)} papers read)")
+    return added
+
+
 # ---------------------------------------------------------------- the heartbeat
 def tick(ctx, max_dispatch: int | None = None):
     cfg = _cfg()
@@ -290,18 +333,44 @@ def tick(ctx, max_dispatch: int | None = None):
             spawned += 1
     s["stats"]["harvested"] += harvested
 
-    # 2) SEED baseline work so the swarm never idles
+    # 2) SEED work so the swarm never idles
     foci = _active_foci(s)
     inflight = len([t for t in s["queue"] if t["status"] in ("pending", "running")])
-    if inflight < cfg["target_inflight"]:
+    bw = cfg["baseline_worker"]
+    target = cfg["target_inflight"]
+
+    # 2a) keep the charter's focus diseases covered
+    if inflight < target:
         for disease in charter_mod.load().get("focus_diseases", []):
-            if inflight >= cfg["target_inflight"]:
+            if inflight >= target:
                 break
-            if (cfg["baseline_worker"], disease) in foci:
+            if (bw, disease) in foci:
                 continue
-            _enqueue(s, cfg["baseline_worker"], {"disease": disease}, "baseline",
-                     f"scan {disease}")
-            foci.add((cfg["baseline_worker"], disease))
+            _enqueue(s, bw, {"disease": disease}, "baseline", f"scan {disease}")
+            foci.add((bw, disease))
+            inflight += 1
+
+    # 2b) go beyond the fixed list — work the topics scouted from the world's papers
+    if cfg.get("explore_world", True) and inflight < target:
+        pending_topics = [d for d in s["discovered"] if not d.get("worked")]
+        if not pending_topics:
+            try:
+                _scout(s, cfg, ctx)
+                pending_topics = [d for d in s["discovered"] if not d.get("worked")]
+            except Exception as e:
+                ctx.log(f"🌐 world scout skipped: {str(e)[:80]}")
+        for d in pending_topics:
+            if inflight >= target:
+                break
+            if d["kind"] == "target":
+                pb, params = "target_intel", {"target": d["name"]}
+            else:
+                pb, params = bw, {"disease": d["name"]}
+            d["worked"] = True
+            if (pb, d["name"]) in foci:
+                continue
+            _enqueue(s, pb, params, "world", f"world · {d['kind']}: {d['name']}")
+            foci.add((pb, d["name"]))
             inflight += 1
 
     # 3) DISPATCH a small batch of pending tasks as tracked runs
@@ -329,10 +398,18 @@ def tick(ctx, max_dispatch: int | None = None):
 
     pend = len([t for t in s["queue"] if t["status"] == "pending"])
     run = len([t for t in s["queue"] if t["status"] == "running"])
+    unworked_topics = len([d for d in s["discovered"] if not d.get("worked")])
     lines = ["# Swarm tick", "",
              f"Harvested **{harvested}**, dispatched **{dispatched}**, escalated **{escalated}**, "
              f"spawned **{spawned}** new agent(s). In flight: {run} running, {pend} pending, "
-             f"{len(s['dynamic_agents'])} dynamic agent(s).", ""]
+             f"{len(s['dynamic_agents'])} dynamic agent(s). World topics known: "
+             f"{len(s['discovered'])} ({unworked_topics} not yet worked).", ""]
+    world_now = [t for t in s["queue"] if t.get("origin") == "world" and t["status"] in ("running", "pending")]
+    if world_now:
+        lines += ["## From the world (literature-scouted)", ""]
+        for t in world_now[:8]:
+            lines.append(f"- {t.get('label','')}")
+        lines.append("")
     unread = [e for e in s["escalations"] if not e["read"]]
     if unread:
         lines += ["## Unread escalations", ""]
@@ -340,7 +417,8 @@ def tick(ctx, max_dispatch: int | None = None):
             lines.append(f"- **[{e['tier']}]** {e['title']} — {e['detail']}")
     summary = {"harvested": harvested, "dispatched": dispatched, "escalated": escalated,
                "spawned": spawned, "running": run, "pending": pend,
-               "dynamic_agents": len(s["dynamic_agents"]), "unread": len(unread)}
+               "dynamic_agents": len(s["dynamic_agents"]), "unread": len(unread),
+               "world_topics": len(s["discovered"]), "world_unworked": unworked_topics}
     return summary, lines
 
 
@@ -364,6 +442,10 @@ def status():
         "stats": s["stats"],
         "escalations": sorted(s["escalations"], key=lambda e: (e["read"], -e["created"]))[:40],
         "unread": len([e for e in s["escalations"] if not e["read"]]),
+        "discovered": sorted(s.get("discovered", []), key=lambda d: -(d.get("added") or 0))[:40],
+        "world": {"known": len(s.get("discovered", [])),
+                  "unworked": len([d for d in s.get("discovered", []) if not d.get("worked")]),
+                  "scouts": s["stats"].get("world_scouts", 0)},
     }
 
 
@@ -422,6 +504,9 @@ def live():
     for a in s["dynamic_agents"]:
         acts.append({"t": a.get("created", 0), "icon": "✦",
                      "text": f"spawned {a['name']} — {a.get('reason','')[:60]}"})
+    for d in s.get("discovered", []):
+        acts.append({"t": d.get("added", 0), "icon": "🌐",
+                     "text": f"picked up {d['kind']} from the world: {d['name']}"})
     for e in s["escalations"]:
         acts.append({"t": e["created"], "icon": "★" if e["tier"] == "lead" else "•",
                      "text": f"[{e['tier']}] {e['title']}"})

@@ -43,6 +43,7 @@ DEFAULT = {
         "enabled": True, "batch_per_tick": 1, "target_inflight": 1, "max_dynamic_agents": 12,
         "escalate_leads": True, "escalate_findings": True, "email_alerts": True,
         "baseline_worker": "discovery_mission",
+        "explore_world": True, "world_batch": 3, "max_world_topics": 300,
     },
 }
 

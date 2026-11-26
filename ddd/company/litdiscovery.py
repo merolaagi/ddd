@@ -60,6 +60,85 @@ def _clean_disease(s: str) -> str:
     return s2 or s
 
 
+# generic disease words the text-miner tags that are too broad to work on directly
+_DISEASE_STOP = {"disease", "diseases", "disorder", "disorders", "syndrome", "syndromes",
+                 "condition", "conditions", "illness", "illnesses", "symptom", "symptoms",
+                 "pain", "injury", "injuries", "toxicity", "death", "complication",
+                 "complications", "dysfunction", "deficiency", "abnormality", "abnormalities",
+                 "lesion", "lesions", "pathology", "pathologies", "tumor", "tumour", "tumors",
+                 "tumours", "neoplasm", "neoplasms", "malignancy", "malignancies", "carcinoma",
+                 "infection", "infections", "inflammation", "fibrosis", "sclerosis", "failure",
+                 "cancer", "cancers", "fever", "bleeding", "edema", "necrosis", "sepsis",
+                 "comorbidity", "comorbidities", "mortality", "morbidity", "relapse", "metastasis"}
+
+# recent, broad "go out into the world" queries — each scout sweeps a different slice
+_WORLD_QUERIES = [
+    '("drug target" OR "therapeutic target") AND (novel OR "first-in-class") AND LANG:"eng"',
+    '("drug repurposing" OR "drug repositioning") AND (disease OR disorder) AND LANG:"eng"',
+    '("small molecule inhibitor" OR "lead compound") AND (treatment OR therapy) AND LANG:"eng"',
+    '("unmet medical need" OR "rare disease") AND (target OR inhibitor OR therapy) AND LANG:"eng"',
+    '("druggable" OR "mechanism of action") AND (neurodegeneration OR autoimmune OR metabolic OR oncology) AND LANG:"eng"',
+    '("new indication" OR "first-in-human" OR "phase 1") AND (inhibitor OR antagonist OR agonist) AND LANG:"eng"',
+]
+
+
+def _plausible_disease(name: str) -> bool:
+    n = (name or "").strip()
+    low = n.lower()
+    if low in _DISEASE_STOP or low in _STOP or low in _CHEM_STOP:
+        return False
+    if len(n) < 4 or len(n) > 42:
+        return False
+    if re.fullmatch(r"[\d\W]+", n):
+        return False
+    # a bare single generic word is usually too broad; keep specific or multiword names
+    return True
+
+
+def scout_world(cursor: int = 0, want: int = 3, exclude=(), limit_papers: int = 20) -> dict:
+    """Go out into recent literature (not a fixed list) and pick up fresh diseases and
+    targets to work on. Rotates through broad frontier queries by `cursor`, text-mines
+    the papers for diseases + genes/proteins, and returns new topics not in `exclude`.
+    Pure read; degrades to empty if Europe PMC is unreachable."""
+    from ..sources import literature
+    exclude = {str(x).strip().lower() for x in (exclude or ())}
+    query = _WORLD_QUERIES[cursor % len(_WORLD_QUERIES)]
+    s = literature.search(query, limit=limit_papers, sort="P_PDATE_D desc")
+    papers = s.get("papers") or []
+    if not papers:
+        return {"query": query, "papers": 0, "diseases": [], "targets": [], "drugs": []}
+    ann = literature.annotate(papers, types=("Diseases", "Gene_Proteins", "Chemicals"))
+
+    diseases, seen = [], set(exclude)
+    for d in ann.get("diseases", []):
+        nm = d["name"].strip()
+        low = nm.lower()
+        if low in seen or not _plausible_disease(nm):
+            continue
+        seen.add(low)
+        diseases.append(nm)
+        if len(diseases) >= want:
+            break
+
+    targets, seen_t = [], set(exclude)
+    for g in ann.get("gene_proteins", []):
+        nm = g["name"].strip()
+        low = nm.lower()
+        if low in seen_t or not _plausible_target(nm) or g["papers"] < 2:
+            continue
+        seen_t.add(low)
+        targets.append(nm)
+        if len(targets) >= max(2, want):
+            break
+
+    drugs = [c["name"].strip() for c in ann.get("chemicals", [])
+             if c["name"].lower() not in _CHEM_STOP and c["name"].lower() not in _STOP
+             and len(c["name"]) > 3][:6]
+
+    return {"query": query, "papers": len(papers),
+            "diseases": diseases, "targets": targets, "drugs": drugs}
+
+
 def _plausible_target(name: str) -> bool:
     n = name.strip()
     low = n.lower()
