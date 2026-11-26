@@ -78,3 +78,18 @@ select::-ms-expand{display:none}
 .idx-row:hover{background:var(--accent-soft)!important}
 .scale{transition:border-color .1s,background .1s}
 .scale:hover{border-color:var(--sel-line)!important;background:var(--hover)!important}
+
+/* Rich report panels: plain monospace for logs, rendered HTML for reports */
+.report-out{max-height:560px;overflow:auto;font-family:"JetBrains Mono",ui-monospace,monospace;font-size:12.5px;white-space:pre-wrap;line-height:1.5;background:var(--panel)}
+.report-out.rich{font-family:"Inter",system-ui,sans-serif;white-space:normal;font-size:13.5px;line-height:1.55}
+.report-out.rich h1{font-size:17px;margin:2px 0 8px} .report-out.rich h2{font-size:14.5px;margin:16px 0 6px} .report-out.rich h3{font-size:13.5px;margin:12px 0 4px}
+.report-out.rich table{border-collapse:collapse;width:100%;margin:8px 0}
+.report-out.rich th,.report-out.rich td{border-bottom:1px solid var(--line);padding:5px 8px;text-align:left;font-size:12px;vertical-align:top}
+.report-out.rich th{color:var(--muted);font-weight:600}
+.report-out.rich code{font-family:"JetBrains Mono",monospace;font-size:11.5px;background:var(--panel2,#f3f3f1);padding:1px 4px;border-radius:4px}
+.report-out.rich a{color:var(--accent-strong);text-decoration:none} .report-out.rich a:hover{text-decoration:underline}
+.report-out.rich ul{margin:6px 0;padding-left:20px} .report-out.rich li{margin:2px 0}
+.report-out.rich p{margin:6px 0}
+.mol-link{cursor:pointer;color:var(--accent-strong)!important;text-decoration:underline dotted!important;text-underline-offset:2px}
+.mol-link:hover{background:var(--accent-soft)!important;border-radius:3px}
+#molModal3d{width:100%;height:250px;border:1px solid var(--line);border-radius:10px;background:#0b0f1a;margin:4px 0}

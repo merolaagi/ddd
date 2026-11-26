@@ -31,7 +31,7 @@ def _scales():
     """Scales with runtime detail for the UI: the live Molecular scale opens the
     real-time cell view; the linked Intracellular scale opens Fate Memory Lab
     (URL from DDD_FATE_URL in .env, if set)."""
-    fate = os.environ.get("DDD_FATE_URL", "").strip()
+    fate = os.environ.get("DDD_FATE_URL", "").strip() or "https://fml.fueldeskpro.com"
     out = []
     for s in SCALES:
         s = copy.deepcopy(s)

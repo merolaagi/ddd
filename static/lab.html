@@ -297,7 +297,7 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:
 </style>
 <script>(function(){try{var t=localStorage.getItem("ddd-theme")||"light";document.documentElement.setAttribute("data-theme",t);}catch(e){document.documentElement.setAttribute("data-theme","light");}})();</script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/ink-skin.css?v=0.34.0">
+<link rel="stylesheet" href="/static/ink-skin.css?v=0.35.0">
 </head>
 <body>
 <header class="lab">
@@ -325,7 +325,7 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:
     <p class="muted" style="font-size:13px;margin:-4px 0 12px">Paste a differential-expression gene set (symbols; the first token per line is used) &mdash; it maps the set onto the diseases, pathways and druggable genes in your graph.</p>
     <div class="row"><textarea id="degGenes" placeholder="STAT1, IRF1, CXCL10, GBP1, TAP1, IDO1, CXCL9" style="min-height:90px"></textarea></div>
     <div class="row" style="margin-top:8px"><input id="degDisease" placeholder="optional disease context" style="flex:2"><button onclick="runDeg()">Interpret gene set</button></div>
-    <pre id="degOut" class="mono" style="max-height:520px">Paste a gene set and run.</pre>
+    <div id="degOut" class="report-out" style="max-height:520px">Paste a gene set and run.</div>
   </section>
   <section class="w7">
     <h2>Run an evaluation</h2>
@@ -362,7 +362,7 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:
     </div>
     <div class="grid2">
       <div><h3 class="h3">Run log</h3><div id="progSteps" class="steps"><p class="muted">No program run yet.</p></div></div>
-      <div><h3 class="h3">Program report</h3><pre id="progReport" class="mono" style="max-height:520px">—</pre></div>
+      <div><h3 class="h3">Program report</h3><div id="progReport" class="report-out" style="max-height:520px">—</div></div>
     </div>
   </section>
   <section class="w12" id="repsec">
@@ -377,7 +377,7 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:
       <input id="repName" placeholder="rheumatoid arthritis, type 2 diabetes, lung cancer">
       <button onclick="runRep()">Run repurposing</button>
     </div>
-    <pre id="repOut" class="mono" style="max-height:540px">Pick a mode, type a disease / virus / bacterium, and Run.</pre>
+    <div id="repOut" class="report-out" style="max-height:540px">Pick a mode, type a disease / virus / bacterium, and Run.</div>
   </section>
   <section class="w12" id="missionsec">
     <h2>Discovery mission <span class="muted" style="font-size:12px;font-weight:400">· agents in tandem until a lead</span></h2>
@@ -397,7 +397,7 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:
       <label style="display:flex;align-items:center;gap:6px;font-size:13px;white-space:nowrap"><input type="checkbox" id="litDesign" style="width:auto"> design analogs</label>
       <button onclick="runLit()">Read &amp; discover</button>
     </div>
-    <pre id="litOut" class="mono" style="max-height:620px">Type a condition and run. The agent reads ~20 papers, extracts targets, and pulls drug-like candidate molecules (~30–90s with the external lookups).</pre>
+    <div id="litOut" class="report-out" style="max-height:620px">Type a condition and run. The agent reads ~20 papers, extracts targets, and pulls drug-like candidate molecules (~30–90s with the external lookups).</div>
   </section>
   <section class="w12" id="intelsec">
     <h2>Target intelligence <span class="muted" style="font-size:12px;font-weight:400">· is it worth pursuing?</span></h2>
@@ -411,7 +411,7 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:
       <textarea id="intelIn" rows="1" placeholder="target gene or UniProt — EGFR, KRAS, P00533" style="flex:1;min-width:260px;font-family:inherit"></textarea>
       <button onclick="runIntel()">Run</button>
     </div>
-    <pre id="intelOut" class="mono" style="max-height:560px">Pick a mode and run. Readiness: one target. Identify: paste a protein sequence. Watch: a list of targets (newline-separated).</pre>
+    <div id="intelOut" class="report-out" style="max-height:560px">Pick a mode and run. Readiness: one target. Identify: paste a protein sequence. Watch: a list of targets (newline-separated).</div>
   </section>
   <section class="w12" id="structsec">
     <h2>Protein structure <span class="muted" style="font-size:12px;font-weight:400">· AlphaFold view</span></h2>
@@ -812,7 +812,7 @@ async function runProgram(){
 async function watchProgram(id){
   const j = await api(`/api/jobs/${id}`);
   if(j.steps) $("progSteps").innerHTML = j.steps.map(s => `<div><span class="r">${esc(s.role)}</span> ${esc(s.msg)}</div>`).join("");
-  if(j.status==="done"){ $("progReport").textContent = j.result.report; loadBoard(); }
+  if(j.status==="done"){ richReport(j.result.report,"progReport"); loadBoard(); }
   else if(j.status==="error"){ $("progReport").textContent = "Error: " + j.error; }
   else setTimeout(() => watchProgram(id), 1500);
 }
@@ -1181,7 +1181,7 @@ async function repWatch(id){
   try{
     var r=await api("/api/company/runs/"+id);
     if(r.status==="done"&&r.report){
-      $("repOut").textContent=await (await fetch("/api/company/reports/"+encodeURIComponent(r.report))).text();
+      richReport(await (await fetch("/api/company/reports/"+encodeURIComponent(r.report))).text(),"repOut");
     }else if(r.status==="error"){
       $("repOut").textContent="Error: "+((r.summary&&r.summary.error)||"failed");
     }else{
@@ -1286,7 +1286,7 @@ async function runLit(){
 async function litWatch(id){
   try{
     var r=await api("/api/company/runs/"+id);
-    if(r.status==="done"&&r.report){$("litOut").textContent=await (await fetch("/api/company/reports/"+encodeURIComponent(r.report))).text();}
+    if(r.status==="done"&&r.report){richReport(await (await fetch("/api/company/reports/"+encodeURIComponent(r.report))).text(),"litOut");}
     else if(r.status==="error"){$("litOut").textContent="Error: "+((r.summary&&r.summary.error)||"failed");}
     else{$("litOut").textContent=(r.log||"Working…");setTimeout(function(){litWatch(id);},2500);}
   }catch(e){$("litOut").textContent=e.message;}
@@ -1308,7 +1308,7 @@ async function runIntel(){
 async function intelWatch(id){
   try{
     var r=await api("/api/company/runs/"+id);
-    if(r.status==="done"&&r.report){$("intelOut").textContent=await (await fetch("/api/company/reports/"+encodeURIComponent(r.report))).text();}
+    if(r.status==="done"&&r.report){richReport(await (await fetch("/api/company/reports/"+encodeURIComponent(r.report))).text(),"intelOut");}
     else if(r.status==="error"){$("intelOut").textContent="Error: "+((r.summary&&r.summary.error)||"failed");}
     else{$("intelOut").textContent=(r.log||"Working…");setTimeout(function(){intelWatch(id);},2500);}
   }catch(e){$("intelOut").textContent=e.message;}
@@ -1362,6 +1362,79 @@ function drawPAE(mat, mx){
 function closeTask(){var b=document.getElementById("taskBack"),m=document.getElementById("taskModal");if(b)b.classList.remove("on");if(m)m.classList.remove("on");}
 function openTaskPanel(id){var t=(TASKS||[]).find(function(x){return x.id===id;});if(!t)return;document.getElementById("taskBack").classList.add("on");document.getElementById("taskModal").classList.add("on");renderTaskModal(t);}
 function viewLiveCell(){ closeTask(); var d=document.getElementById("cellDis"); if(d&&!d.value.trim()) d.value="idiopathic pulmonary fibrosis"; if(typeof loadCell==="function") loadCell(); var s=document.getElementById("cellsec"); if(s) s.scrollIntoView({behavior:"smooth"}); }
+
+/* ---- rich report renderer: markdown -> HTML with clickable entities ---- */
+function mdInlineR(s){
+  s=s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  s=s.replace(/`([^`]+)`/g,function(_,c){return "<code>"+c+"</code>";});
+  s=s.replace(/\*\*([^*]+)\*\*/g,"<b>$1</b>");
+  s=s.replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href="$2" target="_blank">$1</a>');
+  return s;
+}
+function mdToHtmlR(md){
+  var lines=(md||"").split("\n"), out=[], i=0, tbl=null;
+  function flushTbl(){ if(tbl){ out.push(renderTbl(tbl)); tbl=null; } }
+  function renderTbl(rows){
+    var h="<table>"; rows.forEach(function(r,ri){
+      if(/^[\s|:-]+$/.test(r)) return;
+      var cells=r.replace(/^\||\|$/g,"").split("|").map(function(x){return x.trim();});
+      var tag=ri===0?"th":"td";
+      h+="<tr>"+cells.map(function(c){return "<"+tag+">"+mdInlineR(c)+"</"+tag+">";}).join("")+"</tr>";
+    }); return h+"</table>";
+  }
+  while(i<lines.length){
+    var ln=lines[i];
+    if(/^\s*\|.*\|\s*$/.test(ln)){ if(!tbl)tbl=[]; tbl.push(ln); i++; continue; }
+    flushTbl();
+    var h=ln.match(/^(#{1,4})\s+(.*)$/);
+    if(h){ out.push("<h"+h[1].length+">"+mdInlineR(h[2])+"</h"+h[1].length+">"); i++; continue; }
+    if(/^\s*[-*]\s+/.test(ln)){ var items=[]; while(i<lines.length&&/^\s*[-*]\s+/.test(lines[i])){ items.push("<li>"+mdInlineR(lines[i].replace(/^\s*[-*]\s+/,""))+"</li>"); i++; } out.push("<ul>"+items.join("")+"</ul>"); continue; }
+    if(/^\s*---+\s*$/.test(ln)){ out.push("<hr>"); i++; continue; }
+    if(ln.trim()===""){ out.push(""); i++; continue; }
+    out.push("<p>"+mdInlineR(ln)+"</p>"); i++;
+  }
+  flushTbl();
+  return out.join("\n");
+}
+function richReport(md, elId){
+  var el=document.getElementById(elId); if(!el) return;
+  var html=mdToHtmlR(md||"");
+  html=html.replace(/\bCHEMBL\d+\b/g,function(id){return '<a href="https://www.ebi.ac.uk/chembl/compound_report_card/'+id+'/" target="_blank">'+id+'</a>';});
+  el.className="report-out rich"; el.innerHTML=html;
+  // SMILES in code -> clickable 3D/property view
+  el.querySelectorAll("code").forEach(function(c){
+    var t=(c.textContent||"").trim();
+    if(/[()\[\]=#]/.test(t) && /^[A-Za-z0-9@+\-\[\]()=#%\/\\.]+$/.test(t) && t.length>=3 && !/^CHEMBL/.test(t)){
+      c.className="mol-link"; c.title="View 3D + properties";
+      c.addEventListener("click",function(){ openMol(t); });
+    }
+  });
+}
+function plainOut(elId, text){ var el=document.getElementById(elId); if(!el)return; el.className="report-out"; el.textContent=text; }
+
+/* ---- molecule modal: RDKit properties + interactive 3D conformer ---- */
+var MOL3D=null;
+async function openMol(smiles){
+  var m=document.getElementById("taskModal"); document.getElementById("taskBack").classList.add("on"); m.classList.add("on");
+  var sj=smiles.replace(/\\/g,"\\\\").replace(/'/g,"\\'");
+  m.innerHTML='<button class="x" onclick="closeMol()">×</button><h3>Molecule</h3>'
+    +'<p class="tk-meta mono" style="word-break:break-all">'+esc(smiles)+'</p>'
+    +'<div id="molModal3d"></div>'
+    +'<div class="tk-sec"><h4>Properties</h4><div id="molModalProps" class="muted" style="font-size:13px">loading…</div></div>'
+    +'<div class="tk-sec"><div class="row" style="gap:8px"><button onclick="copyMol(\''+sj+'\')">Copy SMILES</button>'
+    +'<button class="ghost" onclick="window.open(\'https://pubchem.ncbi.nlm.nih.gov/#query=\'+encodeURIComponent(\''+sj+'\'),\'_blank\')">PubChem</button></div></div>';
+  try{ var d=await api("/api/molecule?smiles="+encodeURIComponent(smiles));
+    if(d&&d.valid){ var rows=[["Formula",d.formula],["MW",d.mol_weight],["QED",d.qed],["logP",d.logp],["TPSA",d.tpsa],["HBD / HBA",d.hbd+" / "+d.hba],["Rings",d.rings],["Rotatable bonds",d.rotatable_bonds],["Lipinski viol.",d.lipinski_violations]];
+      document.getElementById("molModalProps").innerHTML='<table>'+rows.map(function(r){return '<tr><td class="muted">'+r[0]+'</td><td class="num" style="text-align:right">'+r[1]+'</td></tr>';}).join("")+'</table>';
+    } else { document.getElementById("molModalProps").textContent="Invalid SMILES."; }
+  }catch(e){ document.getElementById("molModalProps").textContent=e.message; }
+  try{ var r=await api("/api/mol3d?smiles="+encodeURIComponent(smiles));
+    if(r&&r.ok&&window.$3Dmol){ MOL3D=$3Dmol.createViewer(document.getElementById("molModal3d"),{backgroundColor:"0x0b0f1a"}); MOL3D.addModel(r.molblock,"mol"); MOL3D.setStyle({},{stick:{radius:0.15},sphere:{scale:0.25}}); MOL3D.zoomTo(); MOL3D.render(); MOL3D.spin("y",0.5); }
+    else if(document.getElementById("molModal3d")){ document.getElementById("molModal3d").style.display="none"; }
+  }catch(e){ var g=document.getElementById("molModal3d"); if(g)g.style.display="none"; }
+}
+function closeMol(){ MOL3D=null; closeTask(); }
+function copyMol(s){ try{ navigator.clipboard.writeText(s); }catch(e){} }
 function openScale(id){
   var sc=(window.VSCALES||[]).find(function(x){return x.id===id;}); if(!sc) return;
   var m=document.getElementById("taskModal"); document.getElementById("taskBack").classList.add("on"); m.classList.add("on");
@@ -1500,7 +1573,7 @@ async function runDeg(){
 }
 async function degWatch(id){
   try{var r=await api("/api/company/runs/"+id);
-    if(r.status==="done"&&r.report){document.getElementById("degOut").textContent=await (await fetch("/api/company/reports/"+encodeURIComponent(r.report))).text();}
+    if(r.status==="done"&&r.report){richReport(await (await fetch("/api/company/reports/"+encodeURIComponent(r.report))).text(),"degOut");}
     else if(r.status==="error"){document.getElementById("degOut").textContent="Error: "+((r.summary&&r.summary.error)||"failed");}
     else{document.getElementById("degOut").textContent=(r.log||"Working\u2026");setTimeout(function(){degWatch(id);},2000);}
   }catch(e){document.getElementById("degOut").textContent=e.message;}
