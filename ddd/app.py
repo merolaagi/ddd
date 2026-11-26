@@ -516,10 +516,34 @@ from .company.playbooks import open_index  # noqa: E402
 app.mount("/public", StaticFiles(directory=PUBLIC, html=True, check_dir=False), name="public")
 app.mount("/static", StaticFiles(directory=STATIC, check_dir=False), name="static")
 
+# ---------- Fate Memory Lab (merged in): the Intracellular scale's rule engine ----------
+# FML is vendored as ddd.fml and mounted here so it runs inside ddd at /fml,
+# sharing this process, Neo4j and data tree. Its data dirs live under ddd/data/fml.
+_fml_ok = False
+try:
+    from .config import DATA_DIR as _DDD_DATA  # noqa: E402
+    _fml_dir = _DDD_DATA / "fml"
+    os.environ.setdefault("FML_DATA", str(_fml_dir / "runs"))
+    os.environ.setdefault("FML_WORKSPACES", str(_fml_dir / "workspaces"))
+    os.environ.setdefault("FML_RESEARCH", str(_fml_dir / "research"))
+    os.environ.setdefault("FML_SETTINGS", str(_fml_dir / "settings.json"))
+    from .fml.server import app as _fml_app, ensure_workers as _fml_ensure_workers  # noqa: E402
+    app.mount("/fml", _fml_app, name="fml")
+    _fml_ok = True
+except Exception as _e:  # keep ddd booting even if FML can't load (e.g. missing dep)
+    import sys as _sys
+    print(f"[ddd] Fate Memory Lab not mounted: {_e}", file=_sys.stderr)
+
 
 @app.on_event("startup")
 def _boot():
     engine.start_scheduler()
+    if _fml_ok:
+        try:
+            _fml_ensure_workers()
+        except Exception as e:
+            import sys
+            print(f"[ddd] FML workers not started: {e}", file=sys.stderr)
 
 
 class PlaybookReq(BaseModel):

@@ -122,6 +122,27 @@ class _NullCtx:
 
 
 @mcp.tool()
+def fml_pathways() -> dict:
+    """Fate Memory Lab (merged into ddd as the Intracellular / rule-engine scale):
+    the metabolic pathways its rule engine reasons over — each with the theorems
+    that apply and knock-down behaviour. Returns id, name, species and a short
+    description. Open the full view at /fml/#pathways."""
+    from .fml.pathways import PATHWAYS
+    return {"count": len(PATHWAYS),
+            "pathways": [{"id": p["id"], "name": p["name"], "species": p.get("species"),
+                          "description": (p.get("description") or "")[:220]} for p in PATHWAYS.values()]}
+
+
+@mcp.tool()
+def fml_runs(limit: int = 20) -> dict:
+    """Recent Fate Memory Lab circuit-training runs (the rule engine): does a
+    sign-consistent circuit hold memory better? Returns each run's id, name,
+    status, tasks and arms. Full UI at /fml."""
+    from .fml.server import runs_summary
+    return {"runs": runs_summary(limit)}
+
+
+@mcp.tool()
 def swarm_status() -> dict:
     """The self-running swarm at a glance: whether it's on, how many worker runs are
     in flight, the dynamic specialist agents it has spawned, the per-run stats, and

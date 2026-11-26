@@ -1,0 +1,1133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fate Memory Lab</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧫</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Fraunces:opsz,wght@9..144,500;9..144,700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --agar:#E6ECEF; --surface:#F6F9FA; --ink:#172238; --muted:#56667A; --rule:#C3CFD8; --well:#D3DDE3;
+  --coop:#1F9D57; --broken:#C43D5B; --contract:#3B57D4; --free:#B7840F;
+  --focus:#3B57D4;
+  --body:"Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --display:"Fraunces", Georgia, "Times New Roman", serif;
+}
+@media (prefers-color-scheme: dark){
+  :root{--agar:#141C26; --surface:#1B2532; --ink:#E4EAF0; --muted:#98A7B8; --rule:#2F3D4E; --well:#26323F;
+    --coop:#43C47D; --broken:#E6637F; --contract:#7890F2; --free:#E0AE3C; --focus:#7890F2;}
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--agar);color:var(--ink);font:16px/1.5 var(--body)}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.shell{display:grid;grid-template-columns:320px 1fr;min-height:100vh}
+aside{background:var(--surface);border-right:1px solid var(--rule);padding:28px 22px;display:flex;flex-direction:column;gap:28px}
+main{padding:32px clamp(18px,4vw,48px) 64px;min-width:0}
+h1{font-family:var(--display);font-weight:700;font-size:1.9rem;line-height:1.1;margin:0}
+.lede{color:var(--muted);margin:.4rem 0 0;font-size:.95rem;max-width:34ch}
+h2{font-family:var(--display);font-weight:500;font-size:1.35rem;margin:0 0 .8rem}
+h3{font-size:1rem;margin:0 0 .5rem}
+form{display:grid;gap:14px}
+fieldset{border:0;padding:0;margin:0}
+legend{font-weight:700;margin-bottom:6px}
+.checks{display:flex;flex-wrap:wrap;gap:6px}
+.chip{position:relative}
+.chip input{position:absolute;opacity:0;inset:0;margin:0;cursor:pointer}
+.chip span{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--rule);border-radius:999px;padding:3px 11px;font-size:.9rem}
+.chip input:checked+span{border-color:var(--ink);background:var(--agar)}
+.chip input:focus-visible+span{outline:2px solid var(--focus);outline-offset:2px}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.actions a{color:var(--muted);font-size:.9rem}
+.sd{color:var(--muted);font-size:.8em}
+h3.sub{font-family:var(--display);font-weight:500;font-size:1.1rem;margin:28px 0 4px}
+.nav{display:flex;gap:4px;border:1px solid var(--rule);border-radius:10px;padding:3px;background:var(--agar)}
+.nav button{flex:1;background:none;border:0;border-radius:7px;padding:7px 4px;cursor:pointer;font-size:.92rem;color:var(--ink)}
+.nav button[aria-current="true"]{background:var(--surface);font-weight:700}
+.fields{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0}
+.fields label{display:grid;gap:3px;font-size:.85rem;color:var(--muted)}
+.fields input,.fields select{border:1px solid var(--rule);background:var(--agar);border-radius:6px;padding:5px 7px;color:var(--ink);font-size:.92rem}
+pre.code{background:var(--surface);border:1px solid var(--rule);border-radius:10px;padding:14px;overflow:auto;max-height:420px;font-size:.78rem;line-height:1.45}
+#wsnew{min-width:0;flex:1 1 140px;max-width:100%}
+#modelpanel .modelhead{flex-wrap:nowrap}
+.pill{display:inline-block;border:1px solid var(--rule);border-radius:999px;padding:2px 10px;font-size:.8rem;margin:0 6px 6px 0}
+.report{background:var(--surface);border:1px solid var(--rule);border-radius:14px;padding:18px 22px;margin:0 0 8px;max-width:980px}
+.report h3{font-family:var(--display);font-weight:500;font-size:1.15rem;margin:14px 0 4px}
+.report p{margin:.3rem 0;line-height:1.55}
+.report ul{margin:.3rem 0 0;padding-left:1.2rem}
+.modelbox{margin-top:30px;border-top:1px dashed var(--rule);padding-top:20px}
+.modelhead{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;margin-bottom:10px}
+.modelhead select{border:1px solid var(--rule);background:var(--surface);border-radius:6px;padding:5px 8px}
+.canvaswrap{background:var(--surface);border:1px solid var(--rule);border-radius:14px;overflow-x:auto;
+  background-image:radial-gradient(var(--rule) 1px,transparent 1px);background-size:18px 18px}
+.canvaswrap svg{display:block;min-width:760px;width:100%;height:auto;touch-action:none}
+.node{cursor:grab}.node:active{cursor:grabbing}
+.node rect{fill:var(--agar);stroke:var(--ink);stroke-width:1.2}
+.node.sel rect{stroke:var(--focus);stroke-width:2.4}
+.node text{fill:var(--ink);font-family:var(--body);pointer-events:none}
+.inspector{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px;margin-top:14px}
+.inspector .eq{font-family:ui-monospace,Menlo,monospace;font-size:.9rem;background:var(--surface);border:1px solid var(--rule);border-radius:8px;padding:8px 10px;overflow-x:auto;white-space:nowrap}
+.exports{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.exports a{border:1px solid var(--rule);border-radius:8px;padding:6px 12px;color:var(--ink);text-decoration:none;font-size:.9rem}
+.exports a:hover{border-color:var(--ink)}
+@media (max-width:860px){.inspector{grid-template-columns:1fr}}
+.land svg{width:100%;height:auto;display:block;background:var(--surface);border:1px solid var(--rule);border-radius:14px}
+label.f{display:grid;gap:3px;font-size:.85rem;color:var(--muted)}
+label.f input{border:1px solid var(--rule);background:var(--agar);border-radius:6px;padding:6px 8px;font-size:.95rem;color:var(--ink);width:100%}
+details summary{cursor:pointer;color:var(--muted);font-size:.9rem}
+details[open] summary{margin-bottom:10px}
+.btn{background:var(--ink);color:var(--surface);border:0;border-radius:8px;padding:10px 14px;font-weight:700;cursor:pointer}
+.btn:disabled{opacity:.5;cursor:wait}
+.btn.ghost{background:transparent;color:var(--muted);border:1px solid var(--rule);font-weight:400;padding:6px 12px}
+.runs{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.runs button{width:100%;text-align:left;background:none;border:0;border-radius:6px;padding:8px 10px;cursor:pointer;display:grid;gap:1px}
+.runs button[aria-current="true"]{background:var(--agar)}
+.runs .nm{font-weight:700;font-size:.92rem}
+.runs .sub{font-size:.8rem;color:var(--muted)}
+.status{font-size:.8rem;font-weight:700}
+.status.running,.status.queued{color:var(--contract)} .status.failed{color:var(--broken)} .status.done{color:var(--coop)}
+.empty{max-width:52ch;margin-top:12vh}
+.empty p{color:var(--muted)}
+.runhead{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:22px}
+.runhead p{margin:.2rem 0 0;color:var(--muted);font-size:.9rem}
+.progress{display:grid;gap:6px;margin-bottom:32px;max-width:720px}
+.prow{display:grid;grid-template-columns:90px 1fr;gap:10px;align-items:center;font-size:.85rem}
+.bars{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:4px}
+.bar{height:8px;background:var(--well);border-radius:4px;overflow:hidden}
+.bar i{display:block;height:100%;transition:width .6s}
+section.task{border-top:1px solid var(--rule);padding-top:26px;margin-top:26px}
+.taskhead{display:flex;flex-wrap:wrap;gap:4px 18px;align-items:baseline}
+.taskhead p{margin:0 0 1rem;color:var(--muted);font-size:.92rem;max-width:62ch}
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:.92rem;min-width:560px}
+th,td{padding:7px 12px;text-align:right;border-bottom:1px solid var(--rule)}
+td{white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{font-weight:400;color:var(--muted);font-size:.82rem}
+.plates{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:22px;margin:24px 0}
+.plate figcaption{font-size:.85rem;margin-bottom:6px;display:flex;justify-content:space-between;gap:8px}
+.plate figcaption b{display:inline-flex;align-items:center;gap:6px}
+.plate figcaption span{color:var(--muted)}
+.plate svg{width:100%;height:auto;display:block;background:var(--surface);border:1px solid var(--rule);border-radius:14px}
+figure{margin:0}
+.charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:22px}
+.chart svg{width:100%;height:auto;display:block}
+.chart figcaption{font-size:.85rem;color:var(--muted);margin-bottom:4px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:.82rem;color:var(--muted);margin-top:6px}
+.err{background:var(--surface);border-left:3px solid var(--broken);padding:10px 14px;white-space:pre-wrap;font-size:.85rem}
+.note{font-size:.82rem;color:var(--muted)}
+@media (max-width:860px){.shell{grid-template-columns:1fr}aside{border-right:0;border-bottom:1px solid var(--rule)}}
+@media (prefers-reduced-motion:reduce){.bar i{transition:none}}
+</style>
+</head>
+<body>
+<div class="shell">
+<aside>
+  <div>
+    <h1>Fate memory lab</h1>
+    <p class="lede">Does a sign-consistent circuit, like the ones cells use to hold their identity, make a better memory layer?</p>
+  </div>
+  <nav class="nav" id="nav">
+    <button type="button" data-view="runs" aria-current="true">Runs</button>
+    <button type="button" data-view="models">Models</button>
+    <button type="button" data-view="pathways">Pathways</button>
+    <button type="button" data-view="research">Research</button>
+  </nav>
+  <div id="runpanel">
+  <form id="form" novalidate>
+    <label class="f">Run name<input name="name" placeholder="Optional"></label>
+    <fieldset><legend>Tasks</legend><div class="checks" id="tasks"></div></fieldset>
+    <fieldset><legend>Arms</legend><div class="checks" id="arms"></div></fieldset>
+    <fieldset><legend>Membrane</legend><div class="checks" id="membranes"></div>
+      <p class="note" id="memnote"></p></fieldset>
+    <div class="grid3">
+      <label class="f">Training steps<input name="iters" type="number" min="10" max="20000"></label>
+      <label class="f">Hidden units<input name="hidden" type="number" min="4" max="128"></label>
+      <label class="f">Seeds per arm<input name="repeats" type="number" min="1" max="10"></label>
+    </div>
+    <details>
+      <summary>More settings</summary>
+      <div class="grid2">
+        <label class="f">Learning rate<input name="lr" type="number" step="any" min="0.0001"></label>
+        <label class="f">Batch<input name="batch" type="number" min="1"></label>
+        <label class="f">Train length<input name="train_len" type="number" min="10"></label>
+        <label class="f">Test length<input name="test_len" type="number" min="10"></label>
+        <label class="f">Pulse chance<input name="pulse_prob" type="number" step="any" min="0.01" max="0.99"></label>
+        <label class="f">Substeps<input name="substeps" type="number" min="1" max="10"></label>
+        <label class="f">Self-excitation<input name="self_excitation" type="number" step="any" min="0"></label>
+        <label class="f">Coupling<input name="coupling" type="number" step="any" min="0"></label>
+        <label class="f">Drift levels<input name="drift" placeholder="0.1, 0.2, 0.3"></label>
+        <label class="f">Noise levels<input name="noise" placeholder="0.02, 0.05, 0.1"></label>
+        <label class="f">Division levels<input name="division" placeholder="0.1, 0.25, 0.5"></label>
+        <label class="f">Inhibitor levels<input name="inhibitor" placeholder="0.1, 0.25, 0.5"></label>
+        <label class="f">Seed<input name="seed" type="number"></label>
+        <label class="f">Feedback edges<input name="feedback_edges" type="number" min="0" max="20"></label>
+        <label class="f">Pool size<input name="pool_size" type="number" min="2" max="16"></label>
+      </div>
+    </details>
+    <button class="btn" id="go" type="submit">Start run</button>
+    <p class="note" id="formnote"></p>
+  </form>
+  <div>
+    <h3>Runs</h3>
+    <ul class="runs" id="runs"></ul>
+  </div>
+  </div>
+  <div id="modelpanel" hidden>
+    <h3>Build a model</h3>
+    <p class="note">A workspace is an editable model: add, remove and change layers, run it, read and download its code. Nothing is trained here.</p>
+    <div class="modelhead"><select id="wsnew"><option value="blank">Blank model</option></select><button class="btn" id="wsadd" type="button">Create</button></div>
+    <h3>Your models</h3>
+    <ul class="runs" id="wslist"></ul>
+  </div>
+  <div id="respanel" hidden>
+    <h3>Search current research</h3>
+    <form id="rsform" class="fields" style="grid-template-columns:1fr">
+      <label>Topic<input name="q" placeholder="e.g. HIV viral dynamics antiretroviral"></label>
+      <div class="grid2"><label class="f">Since<input name="since" type="number" min="1900" max="2100" placeholder="2020"></label>
+        <label class="f">Results<input name="n" type="number" min="1" max="40" value="15"></label></div>
+      <label class="chip"><input type="checkbox" name="preprints" checked><span>Include preprints</span></label>
+      <label class="chip"><input type="checkbox" name="oa"><span>Open access only</span></label>
+      <button class="btn" type="submit">Search</button>
+    </form>
+    <p class="note" id="rsstatus"></p>
+    <h3>Model library</h3>
+    <ul class="runs" id="rslib"></ul>
+    <h3>Your research models</h3>
+    <ul class="runs" id="rsmodels"></ul>
+  </div>
+  <div id="pathpanel" hidden>
+    <h3>Pathways</h3>
+    <p class="note">Real metabolic pathways with textbook stoichiometry. The structure is analysed exactly; rate constants are illustrative.</p>
+    <button class="btn ghost" id="benchbtn" type="button">Test the method</button>
+    <p class="note" id="benchnote"></p>
+    <ul class="runs" id="pwlist"></ul>
+  </div>
+  <p class="note"><button class="btn ghost" id="setbtn" type="button">Settings</button></p>
+  <p class="note" id="ver"></p>
+</aside>
+<main id="main">
+  <div class="empty">
+    <h2>No run selected</h2>
+    <p>Start a run on the left. Each task trains all four arms side by side from identical starting weights, then drops 96 random starting states into every trained circuit and records where each one settles.</p>
+  </div>
+</main>
+</div>
+<script>
+const ARM_INFO={
+  coop:{label:"Sign-consistent",desc:"No negative cycles. Theorem guarantees settling."},
+  broken:{label:"One cycle flipped",desc:"Identical except one negative cycle."},
+  contract:{label:"Contraction",desc:"Unique equilibrium, so no stored state."},
+  free:{label:"Unconstrained",desc:"Any weights. No guarantee."},
+  feedback:{label:"Monotone backbone",desc:"Sign-consistent wiring with a few negative feedback edges, the pattern real metabolic pathways show."},
+  pool:{label:"Conserved pools",desc:"Free wiring, but units are grouped into pools whose totals never change, like ATP + ADP."}
+};
+const MEM_INFO={
+  direct:{label:"None",desc:"Signals reach the circuit directly, as in earlier versions."},
+  transporter:{label:"Transporter",desc:"Signals enter through saturating transporters, like proteins carried across a membrane. Intake levels off at high concentration; the network learns each transporter's capacity and affinity."},
+  gated:{label:"Gated channel",desc:"Transporters plus gates the circuit opens and closes itself, so the cell controls its own intake. Signs are arranged so the sign-consistent arm keeps its guarantee."}
+};
+const TASK_INFO={
+  flipflop:"Three switches. Each output must hold the sign of the last pulse on its channel.",
+  xor:"Two switches. The output is their product, so the stored memories have to interact.",
+  parity:"One channel of identical pulses. The output flips on every pulse, which asks an order-preserving circuit to move the same input in opposite directions.",
+  dose:"Flip-flop where every sequence's pulses are scaled by a random dose, from a third as strong to three times as strong. Cells respond to relative change, not absolute amount; this asks whether the circuit can too.",
+  commit:"A drug arrives either as brief strong spikes or as longer, weaker exposures. Once the cell's accumulated exposure crosses a threshold it commits, the way a cell commits to dividing or dying, and the output must switch on and stay on for good. Brief spikes alone should never trigger it.",
+  resistance:"A drug makes the cell respond, but sustained exposure switches it into a drug-tolerant state that ignores the drug. A long enough drug holiday, 25 steps without drug, makes it sensitive again. This is the reversible tolerance of drug-tolerant persister cells.",
+  antagonist:"Two drugs compete for one receptor: an agonist that activates it and an antagonist that blocks it, both drifting slowly. The output is on while the receptor is more than half occupied by the agonist. No memory needed, so even the contraction arm can do well here.",
+  background:"Flip-flop on top of a slowly wandering background level on every channel. Cells adapt to a steady background and still react to sharp signals; this tests whether the circuit can."
+};
+const $=s=>document.querySelector(s);
+const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const armColor=a=>css("--"+a);
+let META=null, CURRENT=null, POLL=null;
+
+const BASE=(function(){var p=location.pathname.replace(/\/index\.html$/,"").replace(/\/$/,"");return p;})();
+const VIEWS=["runs","models","pathways","research"];
+async function api(path,opts){
+  const r=await fetch((path&&path[0]==="/")?BASE+path:path,opts);
+  if(!r.ok){let m=r.statusText;try{m=(await r.json()).detail||m}catch(e){}throw new Error(typeof m==="string"?m:JSON.stringify(m))}
+  return r.json();
+}
+function chip(group,value,label,checked,color){
+  return `<label class="chip"><input type="checkbox" name="${group}" value="${value}" ${checked?"checked":""}><span>${color?`<i class="dot" style="background:${color}"></i>`:""}${label}</span></label>`;
+}
+async function init(){
+  META=await api("/api/meta");
+  const d=META.defaults;
+  $("#tasks").innerHTML=META.tasks.map(t=>chip("tasks",t,t,d.tasks.includes(t))).join("");
+  $("#arms").innerHTML=META.arms.map(a=>chip("arms",a,ARM_INFO[a].label,d.arms.includes(a),armColor(a))).join("");
+  const f=$("#form");
+  for(const k of ["iters","hidden","lr","batch","train_len","test_len","pulse_prob","substeps","self_excitation","coupling","seed","repeats","feedback_edges","pool_size"]) f.elements[k].value=d[k];
+  for(const k of ["drift","noise","division","inhibitor"]) f.elements[k].value=d[k].join(", ");
+  $("#membranes").innerHTML=META.membranes.map(m=>`<label class="chip"><input type="radio" name="membrane" value="${m}" ${m===d.membrane?"checked":""}><span>${MEM_INFO[m].label}</span></label>`).join("");
+  const memNote=()=>{$("#memnote").textContent=MEM_INFO[f.elements.membrane.value].desc};
+  f.querySelectorAll('input[name="membrane"]').forEach(i=>i.onchange=memNote); memNote();
+  $("#ver").textContent=`v${META.version}, ${META.workers} parallel workers`;
+  await refreshRuns();
+  const first=document.querySelector(".runs button");
+  var _h=location.hash.slice(1); if(VIEWS.includes(_h)){setView(_h);} else if(_h){select(_h);} else if(first){select(first.dataset.id);}
+}
+$("#form").addEventListener("submit",async e=>{
+  e.preventDefault();
+  const f=e.target, fd=new FormData(f);
+  const body={name:fd.get("name")||"",tasks:fd.getAll("tasks"),arms:fd.getAll("arms"),
+    drift:nums(fd.get("drift")),noise:nums(fd.get("noise")),division:nums(fd.get("division")),
+    inhibitor:nums(fd.get("inhibitor")),membrane:fd.get("membrane")||"direct"};
+  for(const k of ["iters","hidden","batch","train_len","test_len","substeps","seed","repeats","feedback_edges","pool_size"]) body[k]=parseInt(fd.get(k));
+  for(const k of ["lr","pulse_prob","self_excitation","coupling"]) body[k]=parseFloat(fd.get(k));
+  $("#go").disabled=true; $("#formnote").textContent="";
+  try{const run=await api("/api/runs",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+    f.elements.name.value=""; await refreshRuns(); select(run.id);
+    $("#formnote").textContent="Run started.";
+  }catch(err){$("#formnote").textContent="Run not started: "+err.message}
+  $("#go").disabled=false;
+});
+async function refreshRuns(){
+  const runs=await api("/api/runs");
+  $("#runs").innerHTML=runs.length?runs.map(r=>`<li><button data-id="${r.id}" aria-current="${r.id===CURRENT}">
+    <span class="nm">${esc(r.name)}</span>
+    <span class="sub"><span class="status ${r.status}">${r.status}</span>, ${r.tasks.join(", ")}, ${r.iters} steps, ${r.repeats} seed${r.repeats===1?"":"s"}${r.membrane&&r.membrane!=="direct"?", "+MEM_INFO[r.membrane].label.toLowerCase():""}</span></button></li>`).join("")
+    :`<li class="note">Runs you start appear here.</li>`;
+  document.querySelectorAll(".runs button").forEach(b=>b.onclick=()=>select(b.dataset.id));
+}
+const nums=v=>(v||"").split(",").map(s=>parseFloat(s)).filter(x=>!isNaN(x));
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
+async function select(id){
+  CURRENT=id; location.hash=id;
+  document.querySelectorAll(".runs button").forEach(b=>b.setAttribute("aria-current",b.dataset.id===id));
+  clearTimeout(POLL); await load();
+}
+async function load(){
+  if(!CURRENT) return;
+  let run; try{run=await api("/api/runs/"+CURRENT)}catch(e){$("#main").innerHTML=`<div class="empty"><h2>Run not found</h2><p>It may have been deleted. Pick another run on the left.</p></div>`;return}
+  render(run);
+  if(run.status==="queued"||run.status==="running"){POLL=setTimeout(load,1500)}else{refreshRuns()}
+}
+const mean=a=>a.reduce((x,y)=>x+y,0)/a.length;
+const sdev=a=>a.length<2?0:Math.sqrt(a.reduce((x,y)=>x+(y-mean(a))**2,0)/(a.length-1));
+function stat(vals,fmt){vals=vals.filter(v=>v!==null&&v!==undefined);if(!vals.length)return"–";
+  return fmt(mean(vals))+(vals.length>1?` <span class="sd">± ${fmt(sdev(vals))}</span>`:"")}
+function render(run){
+  const c=run.config, active=run.status==="queued"||run.status==="running", reps=c.repeats||1;
+  const when=new Date(run.created*1000).toLocaleString();
+  const hasRes=run.results.length>0;
+  let h=`<div class="runhead"><div><h2>${esc(run.name)}</h2>
+    <p><span class="status ${run.status}">${run.status}</span>. Started ${when}. ${c.iters} steps, ${c.hidden} units, ${reps} seed${reps===1?"":"s"} per arm, membrane: ${MEM_INFO[c.membrane||"direct"].label.toLowerCase()}, trained on ${c.train_len}, tested on ${c.test_len}.</p></div>
+    <div class="actions">${hasRes?`<a href="${BASE}/api/runs/${run.id}/export.csv">Download CSV</a><a href="${BASE}/api/runs/${run.id}/export.json">Download JSON</a>`:""}
+    ${active?`<button class="btn ghost" id="stop">Stop run</button>`:`<button class="btn ghost" id="del">Delete run</button>`}</div></div>`;
+  if(run.error) h+=`<div class="err">${esc(run.error)}</div>`;
+  if(active){
+    h+=`<div class="progress">`+c.tasks.map(t=>`<div class="prow"><span>${t}</span><div class="bars">`+
+      c.arms.map(a=>{let f=0;for(let r=0;r<reps;r++)f+=run.progress[`${t}__${a}__${r}`]||0;f/=reps;
+        return `<div class="bar" title="${t}, ${ARM_INFO[a].label}, ${Math.round(f*100)}%"><i style="width:${Math.round(f*100)}%;background:${armColor(a)}"></i></div>`}).join("")+`</div></div>`).join("")+`</div>`;
+  }
+  for(const t of c.tasks){
+    const groups=c.arms.map(a=>({arm:a,rs:run.results.filter(r=>r.task===t&&r.arm===a).sort((x,y)=>(x.rep||0)-(y.rep||0))})).filter(g=>g.rs.length);
+    if(!groups.length) continue;
+    const p1=x=>(x*100).toFixed(1)+"%", n0=x=>x.toFixed(0);
+    h+=`<section class="task"><div class="taskhead"><h2>${t}</h2><p>${TASK_INFO[t]}</p></div>`;
+    h+=`<div class="tablewrap"><table><thead><tr><th>Arm</th><th>Seeds</th><th>Accuracy, train length</th><th>Accuracy, test length</th><th>Runs that settled</th><th>Attractors</th><th>Steps to settle</th><th>Negative edges</th><th>Params</th></tr></thead><tbody>`+
+      groups.map(g=>{const rs=g.rs;return `<tr><td><i class="dot" style="background:${armColor(g.arm)}"></i> ${ARM_INFO[g.arm].label}</td><td>${rs.length}</td>
+        <td>${stat(rs.map(r=>r.acc_train_len),p1)}</td><td>${stat(rs.map(r=>r.acc_test_len),p1)}</td><td>${stat(rs.map(r=>r.settled),p1)}</td>
+        <td>${stat(rs.map(r=>r.attractors),n0)}</td><td>${stat(rs.map(r=>r.settle_steps),n0)}</td><td>${stat(rs.map(r=>r.negative_edges),n0)}</td><td>${rs[0].params}</td></tr>`}).join("")+`</tbody></table></div>`;
+    if(reps>1) h+=`<p class="note">Mean ± standard deviation across seeds. Plates show the first seed.</p>`;
+    h+=`<div class="plates">`+groups.map(g=>plate(g.rs[0])).join("")+`</div>`;
+    h+=`<h3 class="sub">Waddington landscape</h3><p class="note">Each map flattens the circuit's states onto their two main directions. Faint lines are 24 random starting states settling; dots are where all 96 end, colored as on the plates. Separate clusters are separate stored memories.</p>
+      <div class="plates">`+groups.map(g=>landscapeFig(g.rs[0])).join("")+`</div>`;
+    h+=`<h3 class="sub">Stress tests</h3><div class="charts"><figure class="chart"><figcaption>Training loss, one line per seed</figcaption>${lossChart(groups)}</figure>
+      <figure class="chart"><figcaption>Weight drift: every connection's strength randomly rescaled, signs kept</figcaption>${stressChart(groups,"drift")}</figure>
+      <figure class="chart"><figcaption>Expression noise: random jitter added to the state at every step</figcaption>${stressChart(groups,"noise")}</figure>
+      <figure class="chart"><figcaption>Cell division: every 40 steps the state is split unevenly, like proteins between daughter cells</figcaption>${stressChart(groups,"division")}</figure>
+      <figure class="chart"><figcaption>Inhibitor drug: a fraction of the circuit's units partly blocked, to 30% of their activity</figcaption>${stressChart(groups,"inhibitor")}</figure>
+      ${groups[0].rs[0].uptake?`<figure class="chart"><figcaption>Membrane uptake: how much signal gets in at each outside concentration, learned transporters averaged</figcaption>${uptakeChart(groups)}</figure>`:""}</div>
+      <p class="note">Stress charts show test-length accuracy, mean across seeds. The leftmost point is the undisturbed circuit.</p>
+      <div class="legend">${groups.map(g=>`<span><i class="dot" style="background:${armColor(g.arm)}"></i> ${ARM_INFO[g.arm].label}</span>`).join("")}</div>
+      ${active?"":`<div class="modelbox" data-task="${t}"><h3 class="sub" style="margin-top:0">Cell model</h3>
+        <p class="note">Turn the best trained circuit for this task into a standalone model: see its layers on a canvas, try it on new inputs, probe it against the real biology, and export it as Python.</p>
+        <button class="btn ghost buildbtn">Build model</button><div class="modelbody"></div></div>`}</section>`;
+  }
+  if(!hasRes&&!active&&!run.error) h+=`<p class="note">This run finished without results.</p>`;
+  if(hasRes&&!active) h=h.replace('<section class="task">','<div id="report" class="report"><p class="note">Writing the explanation of this run…</p></div><section class="task">');
+  if(active&&!hasRes) h+=`<p class="note">Each task, arm and seed trains in its own process. Results appear here as each one finishes.</p>`;
+  $("#main").innerHTML=h;
+  if(hasRes&&!active){loadReport(run.id);document.querySelectorAll(".modelbox").forEach(b=>{b.querySelector(".buildbtn").onclick=()=>buildModel(run.id,b)})}
+  const del=$("#del"); if(del) del.onclick=async()=>{if(!confirm("Delete this run?"))return;await api("/api/runs/"+run.id,{method:"DELETE"});CURRENT=null;location.hash="";$("#main").innerHTML=`<div class="empty"><h2>Run deleted</h2><p>Pick another run or start a new one.</p></div>`;refreshRuns()};
+  const stop=$("#stop"); if(stop) stop.onclick=async()=>{stop.disabled=true;stop.textContent="Stopping";try{await api(`/api/runs/${run.id}/cancel`,{method:"POST"})}catch(e){stop.textContent=e.message}};
+}
+const pct=x=>(x*100).toFixed(1)+"%";
+function wellColor(id){return `hsl(${(190+id*137.508)%360} 55% 52%)`}
+function plate(r){
+  const W=12,H=8,s=22,pad=14;
+  let cells="";
+  r.wells.forEach((id,i)=>{
+    const x=pad+(i%W)*s+s/2, y=pad+Math.floor(i/W)*s+s/2;
+    cells+=id<0?`<circle cx="${x}" cy="${y}" r="7.5" fill="none" stroke="var(--ink)" stroke-width="1.5" stroke-dasharray="2 2"><title>Did not settle</title></circle>`
+      :`<circle cx="${x}" cy="${y}" r="8" fill="${wellColor(id)}"><title>Attractor ${id+1}</title></circle>`;
+  });
+  for(let i=r.wells.length;i<W*H;i++){const x=pad+(i%W)*s+s/2,y=pad+Math.floor(i/W)*s+s/2;cells+=`<circle cx="${x}" cy="${y}" r="8" fill="var(--well)"/>`}
+  return `<figure class="plate"><figcaption><b><i class="dot" style="background:${armColor(r.arm)}"></i>${ARM_INFO[r.arm].label}</b><span>${r.attractors} attractor${r.attractors===1?"":"s"}</span></figcaption>
+    <svg viewBox="0 0 ${W*s+2*pad} ${H*s+2*pad}" role="img" aria-label="${ARM_INFO[r.arm].label}: 96 starting states, ${r.attractors} attractors, ${pct(r.settled)} settled">${cells}</svg></figure>`;
+}
+function axes(w,h,p,xmax,ymin,ymax,xl,yfmt){
+  let g=`<line x1="${p}" y1="${h-p}" x2="${w-10}" y2="${h-p}" stroke="var(--rule)"/><line x1="${p}" y1="10" x2="${p}" y2="${h-p}" stroke="var(--rule)"/>`;
+  for(let k=0;k<=4;k++){const v=ymin+(ymax-ymin)*k/4,y=h-p-(h-p-10)*k/4;g+=`<text x="${p-6}" y="${y+4}" font-size="10" text-anchor="end" fill="var(--muted)">${yfmt(v)}</text>`}
+  g+=`<text x="${w-10}" y="${h-p+16}" font-size="10" text-anchor="end" fill="var(--muted)">${xl}</text>`;
+  return g;
+}
+function lossChart(groups){
+  const w=360,h=200,p=42, rs=groups.flatMap(g=>g.rs);
+  const all=rs.flatMap(r=>r.curve.map(c=>c[1])).filter(v=>v>0);
+  const lo=Math.log10(Math.min(...all)),hi=Math.log10(Math.max(...all))+1e-9;
+  const xmax=Math.max(...rs.flatMap(r=>r.curve.map(c=>c[0])));
+  const X=v=>p+(w-10-p)*v/xmax, Y=v=>h-p-(h-p-10)*(Math.log10(Math.max(v,1e-12))-lo)/(hi-lo);
+  let g=axes(w,h,p,xmax,lo,hi,`step ${xmax}`,v=>Math.pow(10,v).toPrecision(2));
+  const op=rs.length>groups.length?0.55:1;
+  for(const r of rs) g+=`<polyline fill="none" stroke="${armColor(r.arm)}" stroke-opacity="${op}" stroke-width="1.6" points="${r.curve.map(c=>X(c[0]).toFixed(1)+","+Y(c[1]).toFixed(1)).join(" ")}"/>`;
+  return `<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Training loss per arm and seed, log scale">${g}</svg>`;
+}
+function stressChart(groups,key){
+  const w=360,h=200,p=42;
+  const pts=groups.map(gr=>{const r0=gr.rs[0];const levels=r0[key]||[];
+    const bk=key==="drift"?"drift_base":"stress_base";
+    return [[0,mean(gr.rs.map(r=>r[bk]??r.acc_test_len))],...levels.map((d,i)=>[d.eps,mean(gr.rs.map(r=>(r[key]||[])[i]?.acc??NaN).filter(v=>!isNaN(v)))])]});
+  if(pts.every(q=>q.length<2)) return `<p class="note">Not measured in this run.</p>`;
+  const xmax=Math.max(...pts.flat().map(q=>q[0]),0.01);
+  const X=v=>p+(w-10-p)*v/xmax, Y=v=>h-p-(h-p-10)*(v-0.4)/0.6;
+  let g=axes(w,h,p,xmax,0.4,1,`level ${xmax}`,v=>Math.round(v*100)+"%");
+  groups.forEach((gr,i)=>{g+=`<polyline fill="none" stroke="${armColor(gr.arm)}" stroke-width="1.8" points="${pts[i].map(q=>X(q[0]).toFixed(1)+","+Y(Math.max(q[1],0.4)).toFixed(1)).join(" ")}"/>`+
+    pts[i].map(q=>`<circle cx="${X(q[0]).toFixed(1)}" cy="${Y(Math.max(q[1],0.4)).toFixed(1)}" r="3" fill="${armColor(gr.arm)}"><title>${ARM_INFO[gr.arm].label}, level ${q[0]}: ${Math.round(q[1]*1000)/10}%</title></circle>`).join("")});
+  return `<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Test accuracy under ${key} per arm">${g}</svg>`;
+}
+async function loadReport(rid){
+  const box=$("#report"); if(!box) return;
+  try{const r=await api(`/api/runs/${rid}/report`);
+    box.innerHTML=`<h2 style="margin-bottom:.3rem">What this run shows</h2><p>${esc(r.summary.join(" "))}</p>`+
+      r.tasks.map(t=>`<h3>${esc(t.task)}</h3><p>${esc(t.lines.join(" "))}</p>`).join("")+
+      (r.next.length?`<h3>What to try next</h3><ul>${r.next.map(n=>`<li>${esc(n)}</li>`).join("")}</ul>`:"");
+  }catch(e){box.innerHTML=`<p class="note">Could not write the explanation: ${esc(e.message)}</p>`}
+}
+const MODEL={};
+async function buildModel(rid,box,arm,rep){
+  const task=box.dataset.task, body=box.querySelector(".modelbody");
+  box.querySelector(".buildbtn").style.display="none";
+  body.innerHTML=`<p class="note">Building…</p>`;
+  const q=new URLSearchParams({task});if(arm)q.set("arm",arm);if(rep!==undefined)q.set("rep",rep);
+  let m;try{m=await api(`/api/runs/${rid}/model?${q}`)}catch(e){body.innerHTML=`<p class="err">${esc(e.message)}</p>`;return}
+  const key=rid+task; MODEL[key]={rid,task,info:m,sel:"cell",pos:null,seed:0};
+  const qs=`task=${task}&arm=${m.arm}&rep=${m.rep}`;
+  body.innerHTML=`<div class="modelhead"><label class="note">Circuit <select class="pick">${m.candidates.map(c=>`<option value="${c.arm}|${c.rep}" ${c.arm===m.arm&&c.rep===m.rep?"selected":""}>${ARM_INFO[c.arm].label}, seed ${c.rep+1} (${pct(c.acc)})</option>`).join("")}</select></label>
+      <span class="note">${m.graph.total_params} parameters, ${MEM_INFO[m.membrane].label.toLowerCase()} membrane. Drag layers to rearrange; click one to inspect it.</span></div>
+    <div class="canvaswrap"><svg class="canvas" viewBox="0 0 980 250" role="img" aria-label="Model layers"></svg></div>
+    <div class="inspector"><div class="insp"></div><div class="inspviz"></div></div>
+    <h3 class="sub">Try it</h3><div class="modelhead"><button class="btn ghost simbtn">New example</button><span class="note simnote"></span></div>
+    <figure class="chart simchart"></figure>
+    ${m.has_probe?`<h3 class="sub">Probe against the biology</h3><p class="note probenote"></p><figure class="chart probechart"></figure>`:""}
+    <h3 class="sub">Reachability map</h3><p class="note">Finds the circuit's stable states, then kicks each one with every input channel at two strengths and three durations to see where it can go. It also measures how much noise it takes to shake the cell out of each state, and, for a sign-consistent circuit behind gated channels, checks the theory's prediction about which way each input can move it.</p>
+    <button class="btn ghost reachbtn">Map the states</button><div class="reachbody"></div>
+    ${m.has_therapy?`<h3 class="sub">Therapy search</h3><p class="note">Puts the model into its unwanted state, then tries ${""}90 drug schedules (dose, time on, time off, with and without an inhibitor) over ${""}120 steps and checks which bring it back. The true rule is run on the same schedules for comparison.</p>
+      <button class="btn ghost therbtn">Search schedules</button><div class="therbody"></div>`:""}
+    <h3 class="sub">Export</h3><p class="note">Every file name carries the task, arm, seed and run, so downloads never overwrite each other.</p>
+    <div class="exports"><a href="${BASE}/api/runs/${rid}/model/export?${qs}&kind=numpy">Python, NumPy only</a><a href="${BASE}/api/runs/${rid}/model/export?${qs}&kind=torch">PyTorch module</a><a href="${BASE}/api/runs/${rid}/model/export?${qs}&kind=json">Layer graph and weights, JSON</a></div>`;
+  body.querySelector(".pick").onchange=e=>{const [a,r]=e.target.value.split("|");buildModel(rid,box,a,parseInt(r))};
+  drawCanvas(key,body);
+  body.querySelector(".simbtn").onclick=()=>{MODEL[key].seed++;runSim(key,body)};
+  runSim(key,body);
+  if(m.has_probe) runProbe(key,body);
+  if(m.has_therapy) body.querySelector(".therbtn").onclick=()=>runTherapy(key,body);
+  body.querySelector(".reachbtn").onclick=()=>runReach(key,body);
+}
+async function runReach(key,body){
+  const st=MODEL[key],m=st.info,out=body.querySelector(".reachbody");
+  out.innerHTML=`<p class="note">Kicking every stable state… this takes a few seconds.</p>`;
+  let d;try{d=await api(`/api/runs/${st.rid}/model/reach?task=${st.task}&arm=${m.arm}&rep=${m.rep}`)}catch(e){out.innerHTML=`<p class="err">${esc(e.message)}</p>`;return}
+  if(!d.attractors.length){out.innerHTML=`<p>${esc(d.note)}</p>`;return}
+  const A=d.attractors, n=A.length;
+  const byKick=A.filter(a=>a.found_by_kick).length;
+  let t=`<p>The circuit has ${n} stable state${n===1?"":"s"} worth mapping: the largest basins from 96 random starts${byKick?`, plus ${byKick} that random starts never found but kicks reached`:""}. ${d.kicks} different input kicks were tried on each. `;
+  const traps=A.filter(a=>a.trap);
+  if(n===1) t+="With a single stable state there is nowhere to go: every kick returns to it. ";
+  else if(traps.length) t+=`${traps.length} state${traps.length===1?" is a trap":"s are traps"}: no kick in the library moves the cell out of ${traps.length===1?"it":"them"} (${traps.map(a=>"S"+(a.id+1)).join(", ")}). `;
+  else t+="Every state can be left by at least one kick. ";
+  const hard=A.filter(a=>a.barrier===null);
+  if(hard.length) t+=`${hard.length} state${hard.length===1?" holds":"s hold"} even under the strongest noise tested, so noise alone will not shake a cell out. `;
+  t+=`</p>`;
+  if(d.theory){
+    const th=d.theory;
+    t+=`<p><b>Theory check.</b> `+(th.holds?`This circuit is sign-consistent, so monotone systems theory makes a hard prediction: a kick through a membrane channel can only move the cell in that channel's direction in the circuit's order, never the other way. Of ${th.tested} kicks, ${th.violations} broke that rule${th.violations?", which should be impossible and is worth investigating":", as the theorem says"}. `
+      :`This circuit has one flipped sign, so the theorem no longer applies. Even so, ${th.violations} of ${th.tested} kicks broke the order rule. `);
+    if(th.direction!=="both"&&th.holds){
+      t+=`Every input available here pushes the cell the same way (${th.direction}) in that order. That has a strong consequence: <b>no schedule of this drug, of any dose, timing or length, can ever bring the cell back to a state below where it is now</b>. That is a structural reason a state can be untreatable, not a failure of the search. `;
+      if(th.provable_traps.length){const one=th.provable_traps.length===1;t+=`Among the states found, ${th.provable_traps.map(i=>"S"+(i+1)).join(", ")} ${one?"has":"have"} nothing further ${th.direction}, so ${one?"it is a dead end":"they are dead ends"} for this drug. Leaving ${one?"it":"them"} would need a second input that pushes the other way. `}
+    }
+    t+=`</p>`;
+  }
+  const w=760,h=320,pad=40,hs=A.map(a=>a.height),h0=Math.min(...hs),h1=Math.max(...hs)+1e-9;
+  const idx=[...A.keys()].sort((a,b)=>A[a].height-A[b].height);
+  const P={};idx.forEach((i,k)=>{P[i]={x:pad+30+(w-2*pad-60)*(n===1?0.5:k/(n-1)),y:h-pad-(h-2*pad)*(n===1?0.5:(A[i].height-h0)/(h1-h0))}});
+  let g=`<defs><marker id="ra-${key}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="var(--muted)"/></marker></defs>`;
+  g+=`<text x="12" y="${pad-14}" font-size="10" fill="var(--muted)">${d.theory?"higher in the circuit's order":"higher"}</text><text x="12" y="${h-10}" font-size="10" fill="var(--muted)">lower</text>`;
+  const R=i=>8+22*Math.sqrt(Math.max(A[i].basin,0.01));
+  for(const e of d.edges){if(e.to<0)continue;const a=P[e.from],b=P[e.to],dx=b.x-a.x,dy=b.y-a.y,L=Math.hypot(dx,dy)||1,ra=R(e.from),rb=R(e.to);
+    const x1=a.x+dx/L*ra,y1=a.y+dy/L*ra,x2=b.x-dx/L*(rb+3),y2=b.y-dy/L*(rb+3),mx=(x1+x2)/2-dy/L*18,my=(y1+y2)/2+dx/L*18;
+    g+=`<path d="M${x1},${y1} Q${mx},${my} ${x2},${y2}" fill="none" stroke="var(--muted)" stroke-opacity=".6" stroke-width="1.2" marker-end="url(#ra-${key})"><title>S${e.from+1} to S${e.to+1}: channel ${e.channel+1}${e.sign<0?" negative":""}, strength ${e.amp} for ${e.steps} steps</title></path>`}
+  for(const i of idx){const a=A[i],p=P[i];
+    g+=`<circle cx="${p.x}" cy="${p.y}" r="${R(i)}" fill="${wellColor(i)}" stroke="var(--ink)" stroke-width="${a.trap?3:1}" ${a.trap?'stroke-dasharray="3 2"':""}><title>S${i+1}: ${pct(a.basin)} of starts, readout ${a.readout.join(", ")}</title></circle><text x="${p.x}" y="${p.y+4}" font-size="11" font-weight="700" text-anchor="middle" fill="var(--ink)">S${i+1}</text>`}
+  const tbl=`<div class="tablewrap"><table><thead><tr><th>State</th><th>Share of starts</th><th>Output (${esc(d.output_names.join(", "))})</th><th>Can reach</th><th>Reached from</th><th>Noise to escape</th></tr></thead><tbody>`+
+    A.map(a=>`<tr><td><i class="dot" style="background:${wellColor(a.id)}"></i> S${a.id+1}${a.trap?" (trap)":""}</td><td>${a.found_by_kick?"only by kicking":pct(a.basin)}</td><td>${a.readout.map(v=>v>0?"on":"off").join(", ")}</td><td style="white-space:normal;max-width:220px">${a.reaches.length?a.reaches.map(x=>"S"+(x+1)).join(" "):"none"}</td><td style="white-space:normal;max-width:220px">${a.reached_from.length?a.reached_from.map(x=>"S"+(x+1)).join(" "):"none"}</td><td>${a.barrier===null?"more than "+d.sigmas[d.sigmas.length-1]:a.barrier}</td></tr>`).join("")+`</tbody></table></div>`;
+  out.innerHTML=t+`<figure class="chart"><svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Reachability map between stable states">${g}</svg></figure>
+    <p class="note">Circles are stable states, sized by how many random starts end there and stacked by height in the circuit's order. Arrows show which kicks move the cell from one state to another; hover for the gentlest one. Dashed outlines are traps. "Noise to escape" is the smallest noise level that knocks the cell out of that state at least half the time.</p>`+tbl;
+}
+async function runTherapy(key,body){
+  const st=MODEL[key],m=st.info,out=body.querySelector(".therbody");
+  out.innerHTML=`<p class="note">Searching…</p>`;
+  let d;try{d=await api(`/api/runs/${st.rid}/model/therapy?task=${st.task}&arm=${m.arm}&rep=${m.rep}`)}catch(e){out.innerHTML=`<p class="err">${esc(e.message)}</p>`;return}
+  if(!d.induced){out.innerHTML=`<p>The model never reached the ${d.bad} state: a long strong dose did not put it there${d.truth_induced?", although the true rule says it should":""}. There is nothing to reverse, so the search would be meaningless. Train longer or pick a better arm or seed.</p>`;return}
+  let t=`<p>${esc(d.goal)}</p><p>`;
+  t+=d.n_success?`${d.n_success} of ${d.n} schedules brought the model back to ${d.good}. `:`No schedule out of ${d.n} brought the model back to ${d.good}: in this model the ${d.bad} state behaves as a trap. `;
+  if(d.best) t+=d.best.amp===0?`The gentlest that works uses no drug at all${d.best.inhibitor?`, only the inhibitor on ${d.best.inhibitor*100}% of units`:", just a drug holiday"}. `:`The one with the least total drug gives ${d.best.amp} for ${d.best.on} steps, then ${d.best.off} off${d.best.inhibitor?", with the inhibitor":""}, ${d.best.dose} units in all. `;
+  if(d.task==="resistance"){
+    t+=`A plain drug holiday ${d.holiday_works?"works":"does not work"} in the model; in the true rule it ${d.holiday_truth?"works":"does not"}. `;
+    if(d.inhibitor_alone_works&&!d.holiday_works) t+="The inhibitor alone resensitizes the model where a plain holiday does not: a route worth a closer look. ";
+  }
+  const wo=d.by_inhibitor[0], wi=d.by_inhibitor[1];
+  if(wi!==undefined&&wo!==undefined&&wi!==wo) t+=`Adding the inhibitor ${wi>wo?"helps":"hurts"}: ${wi} schedules work with it against ${wo} without. `;
+  t+=`Model and true rule agree on ${pct(d.agreement)} of schedules`+(d.false_cures||d.missed?`, with ${d.false_cures} cure${d.false_cures===1?"":"s"} the biology would not give and ${d.missed} the model misses.`:".")+`</p>`+
+    `<p class="note">The true rule has no inhibitor in it, so it treats the inhibitor panels exactly like the drug-only ones. Differences between the panels come from the model alone.</p>`;
+  const grid=(inh)=>{
+    const cs=26,p=50,cols=d.ons.length*d.offs.length,w=p+cols*cs+10,h=30+d.amps.length*cs+30;
+    let g="";
+    d.amps.forEach((a,i)=>{g+=`<text x="${p-8}" y="${30+i*cs+17}" font-size="10" text-anchor="end" fill="var(--muted)">${a}</text>`;
+      let j=0;for(const on of d.ons)for(const off of d.offs){
+        const r=d.rows.find(x=>x.amp===a&&x.on===on&&x.off===off&&x.inhibitor===inh);
+        g+=`<rect x="${p+j*cs+1}" y="${30+i*cs+1}" width="${cs-2}" height="${cs-2}" rx="3" fill="${r.model?armColor(m.arm):"var(--well)"}"${r.truth?` stroke="var(--ink)" stroke-width="2"`:""}><title>dose ${a}, ${on} on, ${off} off${inh?", inhibitor":""}: model ${r.model?"recovers":"stays "+d.bad}; true rule ${r.truth?"recovers":"stays "+d.bad}; total drug ${r.dose}</title></rect>`;j++}});
+    let j=0;for(const on of d.ons)for(const off of d.offs){g+=`<text x="${p+j*cs+cs/2}" y="${h-12}" font-size="9" text-anchor="middle" fill="var(--muted)">${on}/${off}</text>`;j++}
+    g+=`<text x="${p}" y="18" font-size="11" fill="var(--muted)">${inh?"With inhibitor on "+inh*100+"% of units":"Drug only"}</text>`;
+    return `<svg viewBox="0 0 ${w} ${h}" style="max-width:${w*1.25}px" role="img" aria-label="Therapy schedule results${inh?" with inhibitor":""}">${g}</svg>`;
+  };
+  out.innerHTML=t+`<div class="charts">${d.inhibitors.map(grid).join("")}</div><p class="note">Rows: drug dose. Columns: steps on / steps off. Filled cells are schedules that restore the model; outlined cells are schedules that restore the true rule. Filled without an outline is a cure the biology would not give; outlined without a fill is one the model misses.</p>`;
+}
+function drawCanvas(key,body){
+  const st=MODEL[key], g=st.info.graph, svg=body.querySelector(".canvas");
+  const n=g.nodes.length, NW=112, NH=66;
+  if(!st.pos){st.pos={};g.nodes.forEach((nd,i)=>{st.pos[nd.id]={x:20+i*((980-40-NW)/Math.max(1,n-1)),y:92}})}
+  const P=st.pos, ctr=id=>({x:P[id].x+NW/2,y:P[id].y+NH/2});
+  let e=`<defs><marker id="ar-${key}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="var(--muted)"/></marker></defs>`;
+  for(const [a,b,kind] of g.edges){
+    if(a===b){const x=P[a].x+NW/2,y=P[a].y;e+=`<path d="M${x-16},${y} C${x-34},${y-54} ${x+34},${y-54} ${x+16},${y}" fill="none" stroke="var(--muted)" stroke-width="1.4" marker-end="url(#ar-${key})"/><text x="${x}" y="${y-44}" font-size="10" text-anchor="middle" fill="var(--muted)">recurrent</text>`;continue}
+    const A=ctr(a),B=ctr(b);
+    if(kind==="feedback"){const y=Math.max(P[a].y,P[b].y)+NH+44;e+=`<path d="M${A.x},${P[a].y+NH} C${A.x},${y} ${B.x},${y} ${B.x},${P[b].y+NH+2}" fill="none" stroke="var(--broken)" stroke-dasharray="4 3" stroke-width="1.4" marker-end="url(#ar-${key})"/><text x="${(A.x+B.x)/2}" y="${y-8}" font-size="10" text-anchor="middle" fill="var(--muted)">state controls the gates</text>`;continue}
+    const x1=P[a].x+NW,y1=A.y,x2=P[b].x,y2=B.y;
+    e+=`<path d="M${x1},${y1} C${(x1+x2)/2},${y1} ${(x1+x2)/2},${y2} ${x2-2},${y2}" fill="none" stroke="var(--muted)" stroke-width="1.4" marker-end="url(#ar-${key})"/>`;
+  }
+  const nodes=g.nodes.map(nd=>`<g class="node ${st.sel===nd.id?"sel":""}" data-id="${nd.id}" transform="translate(${P[nd.id].x},${P[nd.id].y})" tabindex="0">
+    <rect width="${NW}" height="${NH}" rx="10"/><text x="${NW/2}" y="25" font-size="12.5" font-weight="700" text-anchor="middle">${esc(nd.title)}</text>
+    <text x="${NW/2}" y="42" font-size="10.5" text-anchor="middle" opacity=".7">${esc(nd.type)}</text>
+    <text x="${NW/2}" y="57" font-size="10" text-anchor="middle" opacity=".6">${nd.params?nd.params+" params":"no params"}</text></g>`).join("");
+  svg.innerHTML=e+nodes;
+  svg.querySelectorAll(".node").forEach(el=>{
+    const id=el.dataset.id;
+    el.onclick=()=>{st.sel=id;drawCanvas(key,body)};
+    el.onkeydown=ev=>{if(ev.key==="Enter"||ev.key===" "){st.sel=id;drawCanvas(key,body)}};
+    el.onpointerdown=ev=>{
+      const pt=svg.createSVGPoint(), m0=svg.getScreenCTM().inverse();pt.x=ev.clientX;pt.y=ev.clientY;const s0=pt.matrixTransform(m0);
+      const o={x:P[id].x,y:P[id].y};let moved=false;el.setPointerCapture(ev.pointerId);
+      el.onpointermove=mv=>{pt.x=mv.clientX;pt.y=mv.clientY;const s1=pt.matrixTransform(m0);
+        P[id].x=Math.max(0,Math.min(980-NW,o.x+s1.x-s0.x));P[id].y=Math.max(0,Math.min(250-NH,o.y+s1.y-s0.y));
+        if(Math.abs(s1.x-s0.x)+Math.abs(s1.y-s0.y)>3){moved=true;el.setAttribute("transform",`translate(${P[id].x},${P[id].y})`)}};
+      el.onpointerup=()=>{el.onpointermove=null;if(moved){st.sel=id;drawCanvas(key,body)}};
+    };
+  });
+  const nd=g.nodes.find(x=>x.id===st.sel)||g.nodes[0];
+  body.querySelector(".insp").innerHTML=`<h3 style="margin:0 0 4px">${esc(nd.title)} <span class="note">${esc(nd.type)}</span></h3>
+    <div class="eq">${esc(nd.eq)}</div><p>${esc(nd.detail)}</p><p class="note">${nd.params} trainable parameter${nd.params===1?"":"s"}.</p>`;
+  body.querySelector(".inspviz").innerHTML=nd.matrix?Object.entries(nd.matrix).map(([k,M])=>heatmap(k,M)).join(""):nd.vectors?vectorBars(nd.vectors):"";
+}
+function heatmap(name,M){
+  const r=M.length,c=M[0].length,cs=Math.max(4,Math.min(14,Math.floor(300/Math.max(r,c))));
+  const mx=Math.max(...M.flat().map(Math.abs),1e-9);
+  let cells="";M.forEach((row,i)=>row.forEach((v,j)=>{cells+=`<rect x="${j*cs}" y="${i*cs}" width="${cs}" height="${cs}" fill="${v>=0?"var(--contract)":"var(--broken)"}" fill-opacity="${(Math.abs(v)/mx).toFixed(3)}"><title>${name}[${i},${j}] = ${v}</title></rect>`}));
+  return `<figure class="chart"><figcaption>${name}: ${r}×${c}. Blue excites, red inhibits; darker is stronger (max ${mx.toFixed(2)}).</figcaption><svg viewBox="0 0 ${c*cs} ${r*cs}" style="max-width:${c*cs*1.4}px" role="img" aria-label="${name} weight heatmap">${cells}</svg></figure>`;
+}
+function vectorBars(V){
+  return Object.entries(V).map(([k,a])=>{const mx=Math.max(...a,1e-9),w=300,bh=12;
+    return `<figure class="chart"><figcaption>${k} per transporter (max ${mx.toFixed(2)})</figcaption><svg viewBox="0 0 ${w} ${a.length*(bh+4)}" style="max-width:${w}px" role="img" aria-label="${k} values">${a.map((v,i)=>`<rect x="0" y="${i*(bh+4)}" width="${(w-40)*v/mx}" height="${bh}" fill="var(--free)" rx="3"/><text x="${(w-40)*v/mx+6}" y="${i*(bh+4)+10}" font-size="10" fill="var(--muted)">${v}</text>`).join("")}</svg></figure>`}).join("");
+}
+async function runSim(key,body){
+  const st=MODEL[key],m=st.info;
+  const d=await api(`/api/runs/${st.rid}/model/simulate?task=${st.task}&arm=${m.arm}&rep=${m.rep}&seed=${st.seed}`);
+  body.querySelector(".simnote").textContent=`Example ${st.seed+1}: ${pct(d.accuracy)} of steps correct.`;
+  const w=900,h=260,p=40,T=d.inputs[0].length,X=t=>p+(w-10-p)*t/(T-1);
+  const imax=Math.max(...d.inputs.flat().map(Math.abs),1e-9);
+  const top=v=>70-50*v/imax, bot=v=>200-45*Math.max(-1.5,Math.min(1.5,v));
+  let g=`<text x="${p}" y="14" font-size="11" fill="var(--muted)">Inputs: ${esc(d.input_names.join(", "))}</text><line x1="${p}" x2="${w-10}" y1="70" y2="70" stroke="var(--rule)"/>`;
+  d.inputs.forEach((row,i)=>{g+=`<polyline fill="none" stroke="${wellColor(i+3)}" stroke-width="1.3" points="${row.map((v,t)=>X(t).toFixed(1)+","+top(v).toFixed(1)).join(" ")}"/>`});
+  g+=`<text x="${p}" y="126" font-size="11" fill="var(--muted)">Output (solid) against the right answer (dashed): ${esc(d.output_names.join(", "))}</text><line x1="${p}" x2="${w-10}" y1="200" y2="200" stroke="var(--rule)"/>`;
+  d.target.forEach((row,i)=>{g+=`<polyline fill="none" stroke="var(--ink)" stroke-dasharray="4 3" stroke-width="1.1" points="${row.map((v,t)=>X(t).toFixed(1)+","+bot(v).toFixed(1)).join(" ")}"/>`});
+  d.output.forEach((row,i)=>{g+=`<polyline fill="none" stroke="${i?wellColor(i+7):armColor(m.arm)}" stroke-width="1.8" points="${row.map((v,t)=>X(t).toFixed(1)+","+bot(v).toFixed(1)).join(" ")}"/>`});
+  g+=`<text x="${w-10}" y="${h-4}" font-size="10" text-anchor="end" fill="var(--muted)">time step ${T}</text>`;
+  body.querySelector(".simchart").innerHTML=`<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Model simulation on a new example">${g}</svg>`;
+}
+async function runProbe(key,body){
+  const st=MODEL[key],m=st.info;
+  const d=await api(`/api/runs/${st.rid}/model/probe?task=${st.task}&arm=${m.arm}&rep=${m.rep}`);
+  const box=body.querySelector(".probechart"), note=body.querySelector(".probenote");
+  if(d.kind==="dose_response"){
+    note.textContent="Steady response to the agonist at four antagonist levels. The vertical dashed lines mark where the receptor truly reaches half occupancy; a good model crosses zero near each line, and its switch point moves right as more antagonist competes for the receptor.";
+    const w=620,h=260,p=42,xs=d.agonist,all=d.curves.flatMap(c=>c.response),lo=Math.min(-1.2,...all),hi=Math.max(1.2,...all);
+    const X=v=>p+(w-10-p)*v/xs[xs.length-1],Y=v=>h-p-(h-p-10)*(v-lo)/(hi-lo);
+    let g=axes(w,h,p,xs[xs.length-1],lo,hi,"agonist level",v=>v.toFixed(1))+`<line x1="${p}" x2="${w-10}" y1="${Y(0)}" y2="${Y(0)}" stroke="var(--rule)"/>`;
+    d.curves.forEach((c,i)=>{const col=wellColor(i+1);
+      g+=`<line x1="${X(c.threshold_true)}" x2="${X(c.threshold_true)}" y1="10" y2="${h-p}" stroke="${col}" stroke-dasharray="3 3"/>`+
+      `<polyline fill="none" stroke="${col}" stroke-width="2" points="${xs.map((x,j)=>X(x).toFixed(1)+","+Y(c.response[j]).toFixed(1)).join(" ")}"><title>antagonist ${c.antagonist}</title></polyline>`});
+    box.innerHTML=`<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Learned dose-response curves">${g}</svg><div class="legend">${d.curves.map((c,i)=>`<span><i class="dot" style="background:${wellColor(i+1)}"></i> antagonist ${c.antagonist}</span>`).join("")}</div>`;
+  } else if(d.kind==="commit_map"){
+    note.textContent="Each cell is one drug exposure: strength across, duration down. Filled cells are exposures after which the model stays committed; outlined cells are the ones that should commit. Where the two agree, the model has learned the cell's decision rule.";
+    const A=d.amplitude,D=d.duration,cs=22,p=46,w=p+A.length*cs+10,h=p+D.length*cs+10;
+    let g="";
+    D.forEach((dur,i)=>A.forEach((a,j)=>{const on=d.output[i][j]>0,tr=d.truth[i][j]===1;
+      g+=`<rect x="${p+j*cs+1}" y="${10+i*cs+1}" width="${cs-2}" height="${cs-2}" rx="3" fill="${on?armColor(m.arm):"var(--well)"}"${tr?` stroke="var(--ink)" stroke-width="2"`:""}><title>strength ${a}, ${dur} steps: model ${on?"commits":"does not"}, biology ${tr?"commits":"does not"}</title></rect>`}));
+    D.forEach((dur,i)=>{if(i%3===0)g+=`<text x="${p-6}" y="${10+i*cs+15}" font-size="10" text-anchor="end" fill="var(--muted)">${dur}</text>`});
+    A.forEach((a,j)=>{if(j%3===0)g+=`<text x="${p+j*cs+cs/2}" y="${h}" font-size="10" text-anchor="middle" fill="var(--muted)">${a}</text>`});
+    const agree=d.output.flat().filter((v,k)=>(v>0)===(d.truth.flat()[k]===1)).length/d.output.flat().length;
+    note.textContent+=` Agreement: ${pct(agree)}.`;
+    box.innerHTML=`<svg viewBox="0 0 ${w} ${h+4}" style="max-width:${w*1.3}px" role="img" aria-label="Commitment map, model against biology">${g}</svg><p class="note">Down: exposure duration in steps. Across: drug strength.</p>`;
+  }
+}
+function uptakeChart(groups){
+  const w=360,h=200,p=42;
+  const curves=groups.map(g=>{const u0=g.rs[0].uptake;return {arm:g.arm,x:u0.x,y:u0.x.map((_,i)=>mean(g.rs.map(r=>r.uptake.y[i])))}});
+  const ymax=Math.max(...curves.flatMap(c=>c.y),0.1), xmax=Math.max(...curves[0].x);
+  const X=v=>p+(w-10-p)*v/xmax, Y=v=>h-p-(h-p-10)*v/ymax;
+  let g=axes(w,h,p,xmax,0,ymax,`outside ${xmax}`,v=>v.toFixed(2));
+  for(const c of curves) g+=`<polyline fill="none" stroke="${armColor(c.arm)}" stroke-width="1.8" points="${c.x.map((x,i)=>X(x).toFixed(1)+","+Y(c.y[i]).toFixed(1)).join(" ")}"/>`;
+  return `<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Learned membrane uptake curves per arm">${g}</svg>`;
+}
+function landscapeFig(r){
+  const L=r.landscape; const label=ARM_INFO[r.arm].label;
+  if(!L) return `<figure class="land"><figcaption class="note">${label}: landscape not recorded in this run.</figcaption></figure>`;
+  const w=240,h=180,pad=12;
+  const all=[...L.ends,...L.traj.flat()];
+  const xs=all.map(q=>q[0]), ys=all.map(q=>q[1]);
+  const x0=Math.min(...xs),x1=Math.max(...xs)+1e-9,y0=Math.min(...ys),y1=Math.max(...ys)+1e-9;
+  const X=v=>pad+(w-2*pad)*(v-x0)/(x1-x0), Y=v=>h-pad-(h-2*pad)*(v-y0)/(y1-y0);
+  const col=i=>{const id=L.ids[i];return id===undefined||id<0?"var(--muted)":wellColor(id)};
+  let g=L.traj.map((t,i)=>`<polyline fill="none" stroke="${col(i)}" stroke-opacity=".45" stroke-width="1.1" points="${t.map(q=>X(q[0]).toFixed(1)+","+Y(q[1]).toFixed(1)).join(" ")}"/>`).join("");
+  g+=L.ends.map((q,i)=>`<circle cx="${X(q[0]).toFixed(1)}" cy="${Y(q[1]).toFixed(1)}" r="3.2" fill="${col(i)}" stroke="var(--surface)" stroke-width=".8"/>`).join("");
+  const v=L.var.map(x=>Math.round(x*100));
+  return `<figure class="land plate"><figcaption><b><i class="dot" style="background:${armColor(r.arm)}"></i>${label}</b><span>${v[0]+v[1]}% of variation shown</span></figcaption>
+    <svg viewBox="0 0 ${w} ${h}" role="img" aria-label="${label}: settling trajectories projected onto two main directions">${g}</svg></figure>`;
+}
+
+let VIEW="runs", WSMETA=null, WSCUR=null, WSSEL=null, PWCUR=null;
+function setView(v){
+  VIEW=v;
+  document.querySelectorAll("#nav button").forEach(b=>b.setAttribute("aria-current",String(b.dataset.view===v)));
+  $("#runpanel").hidden=v!=="runs"; $("#modelpanel").hidden=v!=="models"; $("#pathpanel").hidden=v!=="pathways";
+  $("#respanel").hidden=v!=="research";
+  if(v==="research"){initResearch();$("#main").innerHTML=`<div class="empty"><h2>Research</h2><p>Search current cell and molecular biology on the left. Pick a paper, let the app read the math out of it, and test whether that math builds a working model you can then study in Pathways and edit on the Models canvas. Or start from a model family in the library.</p></div>`}
+  if(v==="runs"){CURRENT?select(CURRENT):($("#main").innerHTML=`<div class="empty"><h2>No run selected</h2><p>Start a run on the left.</p></div>`)}
+  if(v==="models"){listWorkspaces();$("#main").innerHTML=`<div class="empty"><h2>Models</h2><p>Open one of your models, or create a new one on the left: blank, from a metabolic pathway, or from the best circuit of the run you have open.</p></div>`}
+  if(v==="pathways"){listPathways();$("#main").innerHTML=`<div class="empty"><h2>Pathways</h2><p>Pick a pathway to see its structure, what the theorems say about it, and how it behaves when an enzyme is knocked down.</p></div>`}
+  try{ if(v!=="runs"){ location.hash=v; } else if(!CURRENT){ history.replaceState(null,"",location.pathname+location.search); } }catch(e){}
+}
+document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>setView(b.dataset.view));
+$("#benchbtn").onclick=async()=>{await api("/api/benchmark",{method:"POST"});pollBench(true)};
+async function pollBench(show){
+  const d=await api("/api/benchmark"), note=$("#benchnote");
+  if(d.status==="running"){note.textContent=`Testing every deficiency: ${Math.round(d.progress*100)}% (${d.where})`;setTimeout(()=>pollBench(show),2000)}
+  else if(d.status==="failed"){note.textContent="Failed: "+d.where}
+  else note.textContent=d.result&&d.result.observed_top3!==undefined?`Last test: ${d.result.observed_top3} of ${d.result.scored} in the top 3, against ${d.result.expected_top3} by chance.`:"";
+  if(d.result&&show) renderBench(d.result);
+}
+function renderBench(r){
+  const rows=r.cases.filter(c=>c.drug_moves).sort((a,b)=>(a.rank||99)-(b.rank||99));
+  const verdict=r.z>=2?"better than chance by a margin unlikely to be luck":r.z>=1?"somewhat better than chance, but not by a convincing margin":"no better than chance";
+  $("#main").innerHTML=`<div class="runhead"><div><h2>Testing the method against real drugs</h2>
+      <p class="note">Every enzyme with a known deficiency was knocked down to 5% and the strategy search run on it.</p></div></div>
+    <div class="report"><p>${r.total} deficiencies tested. In ${r.scored} of them, at least one other enzyme in the pathway is a real drug target.</p>
+      <p><b>The model put a real drug target in its top three in ${r.observed_top3} of ${r.scored} cases. A random ranking would manage ${r.expected_top3}.</b> That is ${verdict} (z = ${r.z}).</p>
+      <p class="note">${esc(r.note)}</p></div>
+    <h3 class="sub">Case by case</h3>
+    <div class="tablewrap"><table><thead><tr><th>Pathway</th><th>Enzyme lost</th><th>Condition</th><th>Toxin (fold)</th><th>First real-target move</th><th>Rank</th><th>Chance of top 3</th><th>Real drugs there</th></tr></thead><tbody>`+
+      rows.map(c=>`<tr><td>${esc(c.pathway)}</td><td>${esc(c.enzyme)}</td><td style="text-align:left;white-space:normal">${esc(c.deficiency||"")}</td><td>${esc(String(c.toxin||"—"))} ${c.fold?"("+c.fold+"x)":""}</td>
+        <td style="text-align:left;white-space:normal">${esc(c.matched_move||"")}</td><td>${c.rank??"—"} of ${c.moves}</td><td>${Math.round(c.chance_top3*100)}%</td><td style="text-align:left;white-space:normal">${esc(c.drugs.join(", "))}</td></tr>`).join("")+
+      `</tbody></table></div>`;
+}
+pollBench(false);
+
+async function listWorkspaces(){
+  if(!WSMETA){WSMETA=await api("/api/workspaces/meta");
+    $("#wsnew").innerHTML=`<option value="blank">Blank model</option>`+WSMETA.pathways.map(p=>`<option value="path:${p.id}">From ${esc(p.name)}</option>`).join("")+`<option value="run">From the open run's best circuit</option>`}
+  const ws=await api("/api/workspaces");
+  $("#wslist").innerHTML=ws.length?ws.map(w=>`<li><button data-id="${w.id}" aria-current="${WSCUR&&w.id===WSCUR.id}"><span class="nm">${esc(w.name)}</span><span class="sub">${w.layers.length} layers: ${esc(w.layers.join(" → "))}</span></button></li>`).join(""):`<li class="note">No models yet.</li>`;
+  document.querySelectorAll("#wslist button").forEach(b=>b.onclick=()=>openWorkspace(b.dataset.id));
+}
+$("#wsadd").onclick=async()=>{
+  const v=$("#wsnew").value; let body={};
+  if(v.startsWith("path:")) body={pathway:v.slice(5)};
+  else if(v==="run"){
+    if(!CURRENT){alert("Open a finished run on the Runs tab first.");return}
+    const run=await api("/api/runs/"+CURRENT);
+    body={run_id:CURRENT,task:run.config.tasks[0]};
+  }
+  try{const w=await api("/api/workspaces",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+    await listWorkspaces(); openWorkspace(w.id);
+  }catch(e){alert("Could not create the model: "+e.message)}
+};
+async function saveWs(patch){
+  WSCUR=await api("/api/workspaces/"+WSCUR.id,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(patch)});
+  return WSCUR;
+}
+async function openWorkspace(id){
+  const w=await api("/api/workspaces/"+id); WSCUR=w;
+  WSSEL=(WSSEL&&w.layers.some(l=>l.id===WSSEL))?WSSEL:w.layers[0].id;
+  const c=w.compile||{errors:[],notes:[]}, nin=w.layers[0].params.channels||1;
+  $("#main").innerHTML=`<div class="runhead"><div><h2>${esc(w.name)}</h2>
+      <p class="note">${w.layers.length} layers. Click a layer to edit it. Every change saves and recompiles.</p></div>
+      <div class="actions"><a href="${BASE}/api/workspaces/${id}/code?download=true">Download Python</a><button class="btn ghost" id="wsdel">Delete model</button></div></div>
+    <div id="wsmsg">${c.errors.length?`<div class="err">${c.errors.map(esc).join("\n")}</div>`:""}${c.notes.length?`<p class="note">${c.notes.map(esc).join(" ")}</p>`:""}</div>
+    <div class="canvaswrap"><svg class="wscanvas" viewBox="0 0 980 190" role="img" aria-label="Model layers"></svg></div>
+    <div class="modelhead"><label class="note">Add <select id="wsaddsel">${Object.entries(WSMETA.layer_types).map(([k,v])=>`<option value="${k}">${esc(v.title)}</option>`).join("")}</select></label>
+      <button class="btn ghost" id="wsaddbtn">Insert after selected</button>
+      <button class="btn ghost" id="wsdellayer">Delete selected</button></div>
+    <div class="inspector"><div class="wsinsp"></div><div class="wsviz"></div></div>
+    <h3 class="sub">Run it</h3>
+    <div class="modelhead"><label class="note">Steps <input id="wslen" type="number" value="150" min="10" max="2000" style="width:80px"></label><button class="btn ghost" id="wsrun">Run</button></div>
+    <div class="fields" id="wswaves"></div>
+    <figure class="chart wsout"></figure>
+    <h3 class="sub">Code</h3><p class="note">The model as a single NumPy file, regenerated from the layers above.</p><pre class="code" id="wscode">Loading…</pre>`;
+  $("#wsdel").onclick=async()=>{if(!confirm("Delete this model?"))return;await api("/api/workspaces/"+id,{method:"DELETE"});WSCUR=null;setView("models")};
+  $("#wsaddbtn").onclick=async()=>{const at=w.layers.findIndex(l=>l.id===WSSEL);
+    await api(`/api/workspaces/${id}/layers`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:$("#wsaddsel").value,after:at})});openWorkspace(id)};
+  $("#wsdellayer").onclick=async()=>{if(w.layers.length<2)return;await api(`/api/workspaces/${id}/layers/${WSSEL}`,{method:"DELETE"});WSSEL=null;openWorkspace(id)};
+  $("#wsrun").onclick=()=>runWs();
+  drawWs(); buildWaves(nin); loadWsCode(id); listWorkspaces();
+}
+function drawWs(){
+  const w=WSCUR, svg=document.querySelector(".wscanvas"), L=w.layers, NW=112,NH=62,n=L.length;
+  const X=i=>18+i*((980-36-NW)/Math.max(1,n-1)), Y=70;
+  let g=`<defs><marker id="wa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="var(--muted)"/></marker></defs>`;
+  for(let i=0;i<n-1;i++){g+=`<path d="M${X(i)+NW},${Y+NH/2} C${X(i)+NW+30},${Y+NH/2} ${X(i+1)-30},${Y+NH/2} ${X(i+1)-2},${Y+NH/2}" fill="none" stroke="var(--muted)" stroke-width="1.4" marker-end="url(#wa)"/>`}
+  L.forEach((l,i)=>{
+    const meta=WSMETA.layer_types[l.type]||{title:l.type};
+    const sub=l.type==="circuit"?`${l.params.units} units`:l.type==="pathway"?esc(l.params.pathway):l.type==="input"?`${l.params.channels} in`:l.type==="readout"?`${l.params.outputs} out`:l.type==="linear"?`→ ${l.params.out||"?"}`:"";
+    const rec=l.type==="circuit"||l.type==="pathway";
+    if(rec) g+=`<path d="M${X(i)+NW/2-16},${Y} C${X(i)+NW/2-32},${Y-46} ${X(i)+NW/2+32},${Y-46} ${X(i)+NW/2+16},${Y}" fill="none" stroke="var(--muted)" stroke-width="1.3" marker-end="url(#wa)"/>`;
+    g+=`<g class="node ${WSSEL===l.id?"sel":""}" data-id="${l.id}" transform="translate(${X(i)},${Y})" tabindex="0"><rect width="${NW}" height="${NH}" rx="10"/>
+      <text x="${NW/2}" y="26" font-size="12.5" font-weight="700" text-anchor="middle">${esc(meta.title)}</text>
+      <text x="${NW/2}" y="44" font-size="10.5" text-anchor="middle" opacity=".7">${esc(sub)}</text></g>`;
+  });
+  svg.innerHTML=g;
+  svg.querySelectorAll(".node").forEach(el=>{el.onclick=()=>{WSSEL=el.dataset.id;drawWs()};el.onkeydown=e=>{if(e.key==="Enter"){WSSEL=el.dataset.id;drawWs()}}});
+  inspectWs();
+}
+function inspectWs(){
+  const w=WSCUR, l=w.layers.find(x=>x.id===WSSEL)||w.layers[0], meta=WSMETA.layer_types[l.type];
+  const box=document.querySelector(".wsinsp");
+  let f="";
+  for(const [name,kind,a,b] of (meta.fields||[])){
+    const v=l.params[name];
+    if(kind==="int"||kind==="float") f+=`<label>${name.replace(/_/g," ")}<input data-f="${name}" type="number" step="${kind==="int"?1:"any"}" min="${a}" max="${b}" value="${v??""}"></label>`;
+    else if(kind==="choice") f+=`<label>${name}<select data-f="${name}">${a.map(o=>`<option ${o===v?"selected":""}>${esc(o)}</option>`).join("")}</select></label>`;
+    else if(kind==="vector") f+=`<label>${name} (comma separated)<input data-f="${name}" data-vec="1" value="${(v||[]).join(", ")}"></label>`;
+  }
+  if(l.type==="pathway"){
+    const sp=(WSMETA.pathways.find(p=>p.id===l.params.pathway)||{species:[]}).species;
+    const sel=(key)=>`<label>${key} species<select data-f="${key}" data-multi="1" multiple size="6">${sp.map(x=>`<option ${(l.params[key]||[]).includes(x)?"selected":""}>${esc(x)}</option>`).join("")}</select></label>`;
+    f+=sel("inputs")+sel("outputs");
+  }
+  box.innerHTML=`<h3 style="margin:0 0 4px">${esc(meta.title)} <span class="note">${esc(l.type)}</span></h3>
+    <div class="eq">${esc(meta.eq)}</div><div class="fields">${f||'<p class="note">This layer has no settings.</p>'}</div>`;
+  box.querySelectorAll("[data-f]").forEach(el=>el.onchange=async()=>{
+    const key=el.dataset.f;
+    let val;
+    if(el.dataset.multi) val=[...el.selectedOptions].map(o=>o.value);
+    else if(el.dataset.vec) val=nums(el.value);
+    else if(el.tagName==="SELECT") val=el.value;
+    else val=parseFloat(el.value);
+    const layers=WSCUR.layers.map(x=>x.id===l.id?{...x,params:{...x.params,[key]:val}}:x);
+    if(l.type==="pathway"&&key==="pathway"){const L2=layers.find(x=>x.id===l.id);delete L2.params.inputs;delete L2.params.outputs}
+    if(["units","channels","outputs","out","constraint","self_excitation","coupling"].includes(key)){
+      const L2=layers.find(x=>x.id===l.id); L2.weights={};
+    }
+    await saveWs({layers}); openWorkspace(WSCUR.id);
+  });
+  const viz=document.querySelector(".wsviz");
+  const Wt=l.weights||{};
+  viz.innerHTML=Object.entries(Wt).filter(([k,v])=>Array.isArray(v)&&Array.isArray(v[0])).map(([k,M])=>heatmap(k,M)).join("")||
+    (Object.entries(Wt).filter(([k,v])=>Array.isArray(v)).length?vectorBars(Object.fromEntries(Object.entries(Wt).filter(([k,v])=>Array.isArray(v)&&!Array.isArray(v[0])))):`<p class="note">No weights in this layer.</p>`);
+}
+function buildWaves(nin){
+  const names=(WSCUR.input_names||[]).length===nin?WSCUR.input_names:[...Array(nin)].map((_,i)=>`channel ${i+1}`);
+  $("#wswaves").innerHTML=names.map((nm,i)=>`<label>${esc(nm)}<select data-w="kind" data-i="${i}"><option>pulse</option><option>step</option><option>constant</option><option>train</option><option>ramp</option></select></label>
+    <label>strength<input type="number" step="any" data-w="amp" data-i="${i}" value="1"></label>`).join("");
+}
+async function runWs(){
+  const nin=WSCUR.layers[0].params.channels||1, out=document.querySelector(".wsout");
+  const chans=[...Array(nin)].map((_,i)=>({kind:document.querySelector(`[data-w="kind"][data-i="${i}"]`).value,
+    amp:parseFloat(document.querySelector(`[data-w="amp"][data-i="${i}"]`).value)||0,start:10,width:30,period:60}));
+  out.innerHTML=`<p class="note">Running…</p>`;
+  let d;try{d=await api(`/api/workspaces/${WSCUR.id}/simulate`,{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({length:parseInt($("#wslen").value)||150,channels:chans})})}catch(e){out.innerHTML=`<p class="err">${esc(e.message)}</p>`;return}
+  const T=d.output[0].length,w=900,h=d.trace.length?360:240,p=44,X=t=>p+(w-10-p)*t/(T-1);
+  const imax=Math.max(...d.inputs.flat().map(Math.abs),1e-9),omin=Math.min(...d.output.flat()),omax=Math.max(...d.output.flat());
+  const top=v=>60-42*v/imax, mid=v=>170-70*(v-omin)/((omax-omin)||1);
+  let g=`<text x="${p}" y="14" font-size="11" fill="var(--muted)">Inputs</text>`;
+  d.inputs.forEach((row,i)=>g+=`<polyline fill="none" stroke="${wellColor(i+3)}" stroke-width="1.4" points="${row.map((v,t)=>X(t).toFixed(1)+","+top(v).toFixed(1)).join(" ")}"/>`);
+  g+=`<text x="${p}" y="104" font-size="11" fill="var(--muted)">Output: ${esc((d.output_names||[]).join(", "))}</text>`;
+  d.output.forEach((row,i)=>g+=`<polyline fill="none" stroke="${armColor("coop")}" stroke-opacity="${1-i*0.2}" stroke-width="1.8" points="${row.map((v,t)=>X(t).toFixed(1)+","+mid(v).toFixed(1)).join(" ")}"/>`);
+  let legend="";
+  if(d.trace.length){
+    const S=d.species,tr=d.trace,mx=Math.max(...tr.flat(),1e-9);
+    const keep=S.map((s,i)=>[s,i,Math.max(...tr.map(r=>r[i]))]).sort((a,b)=>b[2]-a[2]).slice(0,8);
+    g+=`<text x="${p}" y="212" font-size="11" fill="var(--muted)">Inside the pathway, the eight busiest species</text>`;
+    keep.forEach(([s,i],k)=>{g+=`<polyline fill="none" stroke="${wellColor(k)}" stroke-width="1.5" points="${tr.map((r,t)=>X(t*(T-1)/(tr.length-1)).toFixed(1)+","+(340-110*r[i]/mx).toFixed(1)).join(" ")}"/>`;
+      legend+=`<span><i class="dot" style="background:${wellColor(k)}"></i> ${esc(s)}</span>`});
+  }
+  out.innerHTML=`<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Model run">${g}</svg>`+(legend?`<div class="legend">${legend}</div>`:"");
+}
+async function loadWsCode(id){const d=await api(`/api/workspaces/${id}/code`);const el=$("#wscode");if(el)el.textContent=d.code}
+
+async function listPathways(){
+  const ps=await api("/api/pathways");
+  $("#pwlist").innerHTML=ps.map(p=>`<li><button data-id="${p.id}" aria-current="${p.id===PWCUR}"><span class="nm">${esc(p.name)}</span><span class="sub">${p.research?"from research, ":""}${p.species} species, ${p.reactions} reactions</span></button></li>`).join("");
+  document.querySelectorAll("#pwlist button").forEach(b=>b.onclick=()=>openPathway(b.dataset.id));
+}
+async function openPathway(pid){
+  PWCUR=pid; listPathways();
+  const a=await api("/api/pathways/"+pid);
+  const st=a.structure;
+  $("#main").innerHTML=`<div class="runhead"><div><h2>${esc(a.name)}</h2><p class="note">${esc(a.description)}</p></div></div>
+    <div class="report"><h3 style="margin-top:0">What the structure says</h3>${a.notes.map(n=>`<p>${esc(n)}</p>`).join("")}
+      <p class="note">Stoichiometry follows ${esc(a.reference)}. Rate constants are illustrative, not measured, so structure is exact while timings are not.</p></div>
+    <h3 class="sub">Structure</h3>
+    <div>${[["species",a.species.length],["reactions",a.reactions.length],["complexes",st.complexes],["linkage classes",st.linkage_classes],["stoichiometric rank",st.rank],["deficiency",st.deficiency],["weakly reversible",st.weakly_reversible?"yes":"no"],["sign-consistent",a.signs.consistent?"yes":"no"]].map(([k,v])=>`<span class="pill">${k}: <b>${v}</b></span>`).join("")}</div>
+    ${a.conservation.length?`<p class="note">Conserved pools: ${a.conservation.map(l=>l.map(([s,c])=>c>1?`${c} ${s}`:s).join(" + ")).join("; ")}.</p>`:""}
+    ${a.signs.conflicts.length?`<p class="note">Sign conflicts (negative feedback): ${a.signs.conflicts.map(c=>c[0]+"→"+c[1]).join(", ")}${a.signs.ambiguous.length?`; ambiguous pairs: ${a.signs.ambiguous.map(c=>c[0]+"→"+c[1]).join(", ")}`:""}.</p>`:""}
+    <h3 class="sub">Reactions</h3>
+    <div class="tablewrap"><table><thead><tr><th>Enzyme</th><th>Reaction</th><th>Regulation</th><th>Knock down</th></tr></thead><tbody>
+      ${a.reactions.map(r=>`<tr><td>${esc(r.enzyme)}</td><td style="text-align:left;white-space:normal">${esc(Object.entries(r.substrates).map(([s,c])=>c>1?c+" "+s:s).join(" + ")||"∅")} ${r.reversible?"⇌":"→"} ${esc(Object.entries(r.products).map(([s,c])=>c>1?c+" "+s:s).join(" + ")||"∅")}</td>
+        <td style="text-align:left">${r.regulators.map(g=>`${esc(g.species)} ${g.effect}s`).join(", ")||"—"}</td>
+        <td><button class="btn ghost kd" data-r="${r.id}">to 20%</button></td></tr>`).join("")}
+    </tbody></table></div>
+    <h3 class="sub">Network</h3>
+    <p class="note">Circles are metabolites, squares are enzyme steps. Drag to rearrange; click any node to see what happens if it changes: an enzyme losing activity, or a metabolite held high or low. Known inherited deficiencies and the drugs that act on each step are marked.</p>
+    <div class="modelhead"><a class="btn ghost" href="${BASE}/api/pathways/${pid}/cypher?download=true">Download Cypher</a>
+      <button class="btn ghost" id="pwpush">Push to Neo4j</button>
+      <button class="btn ghost" id="pwpushall">Push all pathways</button>
+      <button class="btn ghost" id="pwquery">Query Neo4j</button><span class="note" id="pwneo"></span></div>
+    <div id="pwquerybox" hidden>
+      <div class="fields"><label style="grid-column:1/-1">Cypher (read-only)<textarea id="cyq" rows="3" style="width:100%;border:1px solid var(--rule);border-radius:6px;background:var(--agar);color:var(--ink);padding:8px;font-family:ui-monospace,Menlo,monospace;font-size:.85rem"></textarea></label></div>
+      <div class="modelhead"><select id="cypreset"></select><button class="btn ghost" id="cyrun">Run query</button></div>
+      <div id="cyout"></div>
+    </div>
+    <div class="canvaswrap"><svg class="netcanvas" viewBox="0 0 980 520" role="img" aria-label="Pathway network"></svg></div>
+    <div id="whatif"><p class="note">Click a node above.</p></div>
+    <h3 class="sub">Deeper structure</h3>
+    <p class="note">Four further questions, answered by measurement rather than assumption: is the backbone monotone once regulation is stripped out; does any species hold its level when the pools are scaled (concentration robustness); does the pathway have more than one steady state; and which enzyme actually controls the output flux.</p>
+    <button class="btn ghost" id="pwdeep">Analyse</button><div id="pwdeepbody"></div>
+    <h3 class="sub">Simulation</h3><p class="note" id="pwnote">Time courses from a standard starting state. Knock an enzyme down to see what the pathway does without it.</p>
+    <div class="modelhead"><button class="btn ghost" id="pwrun">Run normally</button></div><figure class="chart pwout"></figure>`;
+  document.querySelectorAll(".kd").forEach(b=>b.onclick=()=>runPathway(pid,b.dataset.r));
+  $("#pwrun").onclick=()=>runPathway(pid,null);
+  $("#pwdeep").onclick=()=>runDeeper(pid);
+  drawNetwork(pid); neoStatus(pid);
+  runPathway(pid,null);
+}
+const CYPHER_PRESETS=[
+  ["Conditions and the enzymes that cause them","MATCH (c:Condition)-[:CAUSED_BY_LOSS_OF]->(e:Enzyme) RETURN c.name AS condition, e.name AS enzyme ORDER BY condition"],
+  ["Drugs and what they act on","MATCH (d:Drug)-[a:ACTS_ON]->(r:Reaction) RETURN d.name AS drug, a.effect AS effect, r.enzyme AS enzyme, r.pathway AS pathway"],
+  ["Metabolites shared by more than one pathway","MATCH (m:Metabolite)-[:IS]->(c:Compound) WITH c, collect(DISTINCT m.pathway) AS paths WHERE size(paths) > 1 RETURN c.name AS compound, paths ORDER BY size(paths) DESC"],
+  ["Everything two steps from uric acid","MATCH (c:Compound {name:'Urate'})<-[:IS]-(m:Metabolite)-[*1..2]-(n) RETURN DISTINCT labels(n)[0] AS kind, coalesce(n.name, n.enzyme) AS name LIMIT 40"],
+  ["Conditions linked through a shared metabolite","MATCH (c1:Condition)-[:CAUSED_BY_LOSS_OF]->(:Enzyme)-[:CATALYSES]->(:Reaction)-[:PRODUCES|SUBSTRATE_OF]-(m1:Metabolite)-[:IS]->(c:Compound)<-[:IS]-(m2:Metabolite)-[:PRODUCES|SUBSTRATE_OF]-(:Reaction)<-[:CATALYSES]-(:Enzyme)<-[:CAUSED_BY_LOSS_OF]-(c2:Condition) WHERE m1.pathway <> m2.pathway AND elementId(c1) < elementId(c2) RETURN DISTINCT c1.name AS condition, c.name AS shared_metabolite, c2.name AS linked_condition LIMIT 50"],
+  ["Drugs one shared metabolite away from a condition","MATCH (cond:Condition)-[:CAUSED_BY_LOSS_OF]->(:Enzyme)-[:CATALYSES]->(:Reaction)-[:PRODUCES|SUBSTRATE_OF]-(:Metabolite)-[:IS]->(c:Compound)<-[:IS]-(:Metabolite)-[:PRODUCES|SUBSTRATE_OF]-(r:Reaction)<-[:ACTS_ON]-(d:Drug) RETURN DISTINCT cond.name AS condition, c.name AS via, d.name AS drug, r.enzyme AS acts_on, r.pathway AS pathway LIMIT 50"],
+  ["Enzyme steps with a known deficiency","MATCH (r:Reaction) WHERE r.deficiency IS NOT NULL RETURN r.pathway AS pathway, r.enzyme AS enzyme, r.deficiency AS deficiency"]
+];
+async function neoStatus(pid){
+  const el=$("#pwneo"), btn=$("#pwpush"); if(!el) return;
+  try{const st=await api("/api/neo4j/status");
+    el.textContent=!st.driver_installed?"Neo4j driver not installed: run .venv/bin/pip install neo4j":
+      !st.configured?"Add your Neo4j address and password in Settings to push straight into your database.":`Ready: ${st.uri}, database ${st.database}.`;
+    btn.disabled=!(st.driver_installed&&st.configured);
+  }catch(e){el.textContent=""}
+  const qb=$("#pwquery"), box=$("#pwquerybox");
+  $("#cypreset").innerHTML=CYPHER_PRESETS.map((p,i)=>`<option value="${i}">${esc(p[0])}</option>`).join("");
+  $("#cypreset").onchange=e=>{$("#cyq").value=CYPHER_PRESETS[e.target.value][1]};
+  $("#cyq").value=CYPHER_PRESETS[0][1];
+  qb.onclick=()=>{box.hidden=!box.hidden};
+  $("#cyrun").onclick=async()=>{
+    const out=$("#cyout"); out.innerHTML=`<p class="note">Running…</p>`;
+    try{const r=await api("/api/neo4j/query",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({cypher:$("#cyq").value})});
+      out.innerHTML=r.rows.length?`<div class="tablewrap"><table><thead><tr>${r.columns.map(c=>`<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>${r.rows.map(row=>`<tr>${r.columns.map(c=>`<td style="text-align:left;white-space:normal">${esc(row[c])}</td>`).join("")}</tr>`).join("")}</tbody></table></div><p class="note">${r.count} row${r.count===1?"":"s"}.</p>`:`<p class="note">No rows. The query is valid but found nothing in the pathways loaded so far. If you have only pushed one pathway, press Push all pathways and run it again.</p>`;
+    }catch(e){out.innerHTML=`<p class="err">${esc(e.message)}</p>`}
+  };
+  const all=$("#pwpushall"); if(all){all.disabled=btn.disabled;all.onclick=async()=>{all.disabled=true;el.textContent="Pushing every pathway…";
+    try{const r=await api("/api/neo4j/push",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({})});
+      const n=Object.keys(r.pushed).length,st=Object.values(r.pushed).reduce((a,b)=>a+b,0);
+      el.textContent=`Loaded ${n} pathways (${st} statements) into ${r.uri}.`;
+    }catch(e){el.textContent="Push failed: "+e.message}
+    all.disabled=false}}
+  btn.onclick=async()=>{btn.disabled=true;el.textContent="Pushing…";
+    try{const r=await api("/api/neo4j/push",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({pathway:pid})});
+      el.textContent=`Loaded ${Object.entries(r.pushed).map(([k,v])=>`${k} (${v} statements)`).join(", ")} into ${r.uri}.`;
+    }catch(e){el.textContent="Push failed: "+e.message}
+    btn.disabled=false};
+}
+async function drawNetwork(pid){
+  const g=await api(`/api/pathways/${pid}/graph`), svg=document.querySelector(".netcanvas");
+  const W=980,H=520,N=g.nodes,E=g.edges;
+  const idx={};N.forEach((n,i)=>{idx[n.id]=i});
+  const pos=N.map((n,i)=>({x:W/2+260*Math.cos(2*Math.PI*i/N.length),y:H/2+200*Math.sin(2*Math.PI*i/N.length)}));
+  const links=E.map(e=>[idx[e.from],idx[e.to]]);
+  for(let step=0;step<260;step++){
+    const fx=pos.map(()=>0),fy=pos.map(()=>0);
+    for(let i=0;i<N.length;i++)for(let j=i+1;j<N.length;j++){
+      let dx=pos[i].x-pos[j].x,dy=pos[i].y-pos[j].y,d2=dx*dx+dy*dy+0.01,f=9000/d2;
+      const d=Math.sqrt(d2);fx[i]+=f*dx/d;fy[i]+=f*dy/d;fx[j]-=f*dx/d;fy[j]-=f*dy/d}
+    for(const [a,b] of links){
+      let dx=pos[b].x-pos[a].x,dy=pos[b].y-pos[a].y,d=Math.hypot(dx,dy)||1,f=(d-90)*0.05;
+      fx[a]+=f*dx/d;fy[a]+=f*dy/d;fx[b]-=f*dx/d;fy[b]-=f*dy/d}
+    for(let i=0;i<N.length;i++){
+      pos[i].x=Math.max(40,Math.min(W-40,pos[i].x+Math.max(-12,Math.min(12,fx[i]))+(W/2-pos[i].x)*0.002));
+      pos[i].y=Math.max(30,Math.min(H-30,pos[i].y+Math.max(-12,Math.min(12,fy[i]))+(H/2-pos[i].y)*0.002));}
+  }
+  NET={pid,g,pos,sel:null};
+  paintNetwork();
+}
+let NET=null;
+function paintNetwork(){
+  const {g,pos,sel}=NET, svg=document.querySelector(".netcanvas");
+  let out=`<defs><marker id="na" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="var(--muted)"/></marker></defs>`;
+  const idx={};g.nodes.forEach((n,i)=>{idx[n.id]=i});
+  for(const e of g.edges){const a=pos[idx[e.from]],b=pos[idx[e.to]];
+    const reg=e.type==="REGULATES";
+    out+=`<line x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" stroke="${reg?(e.effect==="inhibit"?"var(--broken)":"var(--coop)"):"var(--muted)"}" stroke-opacity="${reg?0.9:0.5}" stroke-width="${reg?1.4:1.2}" ${reg?'stroke-dasharray="4 3"':""} marker-end="url(#na)"><title>${esc(e.type.toLowerCase().replace("_"," "))}${e.effect?": "+esc(e.effect):""}</title></line>`}
+  g.nodes.forEach((n,i)=>{const p=pos[i],on=sel===n.id;
+    if(n.kind==="species") out+=`<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${on?16:13}" fill="${n.clamped?"var(--well)":"var(--contract)"}" fill-opacity="${n.clamped?1:.85}" stroke="var(--ink)" stroke-width="${on?2.5:1}" class="nnode" data-id="${n.id}"/>`;
+    else out+=`<rect x="${(p.x-16).toFixed(1)}" y="${(p.y-12).toFixed(1)}" width="32" height="24" rx="5" fill="${n.deficiency?"var(--free)":"var(--surface)"}" stroke="${n.drugs&&n.drugs.length?"var(--broken)":"var(--ink)"}" stroke-width="${on?2.5:(n.drugs&&n.drugs.length?2:1)}" class="nnode" data-id="${n.id}"/>`;
+    out+=`<text x="${p.x.toFixed(1)}" y="${(p.y+(n.kind==="species"?26:30)).toFixed(1)}" font-size="10" text-anchor="middle" fill="var(--ink)" pointer-events="none">${esc(n.label)}</text>`});
+  svg.innerHTML=out;
+  svg.querySelectorAll(".nnode").forEach(el=>{
+    el.style.cursor="pointer";
+    el.onclick=()=>{NET.sel=el.dataset.id;paintNetwork();whatIf(el.dataset.id)};
+    el.onpointerdown=ev=>{const i=idx[el.dataset.id],pt=svg.createSVGPoint(),m=svg.getScreenCTM().inverse();
+      el.setPointerCapture(ev.pointerId);
+      svg.onpointermove=mv=>{pt.x=mv.clientX;pt.y=mv.clientY;const q=pt.matrixTransform(m);pos[i].x=q.x;pos[i].y=q.y;paintNetwork()};
+      svg.onpointerup=()=>{svg.onpointermove=null}};
+  });
+}
+async function whatIf(node){
+  const box=$("#whatif"); box.innerHTML=`<p class="note">Working out what changes…</p>`;
+  let d;try{d=await api(`/api/pathways/${NET.pid}/whatif?node=${encodeURIComponent(node)}`)}catch(e){box.innerHTML=`<p class="err">${esc(e.message)}</p>`;return}
+  let h=`<h3 class="sub" style="margin-top:14px">${esc(d.name||d.label)}</h3>`;
+  if(d.deficiency) h+=`<p><b>If this enzyme is missing:</b> ${esc(d.deficiency)}.</p>`;
+  if(d.in_pathways&&d.in_pathways.length>1) h+=`<p class="note">This step appears in: ${d.in_pathways.join(", ")}.</p>`;
+  if(d.drugs&&d.drugs.length) h+=`<p><b>Drugs acting here:</b> ${d.drugs.map(x=>`${esc(x.name)} (${esc(x.effect)}${x.note?", "+esc(x.note):""})`).join("; ")}.</p>`;
+  h+=d.cases.map(c=>`<h4 style="margin:12px 0 4px">${esc(c.label)}</h4>`+
+    (c.changes.length?`<div class="tablewrap"><table><thead><tr><th>Metabolite</th><th>Before</th><th>After</th><th>Change</th></tr></thead><tbody>`+
+      c.changes.map(x=>`<tr><td>${esc(x.species)}</td><td>${x.before}</td><td>${x.after}</td><td>${x.after<1e-3?"to zero":x.before<1e-3?"from zero":x.fold>=1?x.fold.toFixed(2)+"x up":(1/x.fold).toFixed(2)+"x down"}</td></tr>`).join("")+
+      `</tbody></table></div>`:`<p class="note">Nothing moved measurably.</p>`)+
+    (c.pathways&&Object.keys(c.pathways).length?`<p><b>Pathways affected:</b> ${Object.entries(c.pathways).map(([k,v])=>`${esc(k)} (${v.map(esc).join(", ")})`).join("; ")}.</p>`:"")+
+    (c.fluxes.length?`<p class="note">Fluxes that shifted: ${c.fluxes.map(f=>`${esc(f.reaction)} ${f.before} → ${f.after}`).join(", ")}.</p>`:"")+
+    (c.settled?"":`<p class="note">This case had not settled by the end of the run: something is still building up.</p>`)).join("");
+  if(d.kind==="r") h+=`<div class="modelhead" style="margin-top:12px"><button class="btn ghost" id="stratbtn">What would help?</button><span class="note">Tries the standard treatment moves in the model and ranks them.</span></div><div id="stratbody"></div>`;
+  box.innerHTML=h;
+  const sb=$("#stratbtn"); if(sb) sb.onclick=()=>runStrategies(node);
+}
+async function runStrategies(node){
+  const out=$("#stratbody"); out.innerHTML=`<p class="note">Trying each move and re-running the pathway, a few seconds…</p>`;
+  let d;try{d=await api(`/api/pathways/${NET.pid}/strategies?node=${encodeURIComponent(node)}`)}catch(e){out.innerHTML=`<p class="err">${esc(e.message)}</p>`;return}
+  let h=`<p>With ${esc(d.enzyme)} at ${Math.round(d.residual*100)}% activity, `;
+  h+=d.toxin?`${esc(d.toxin)} rises from ${d.toxin_healthy} to ${d.toxin_disease}`:"no single metabolite stands out as accumulating";
+  h+=`, and the pathway's output flux falls from ${d.output_healthy} to ${d.output_disease}. ${d.tried} moves were tried; the best are below. A score of 1 means the pathway is back to healthy on both counts.</p>`;
+  h+=`<div class="tablewrap"><table><thead><tr><th>Move</th><th>Score</th><th>${esc(d.toxin||"toxin")} after</th><th>Output after</th><th>Matches a real drug</th></tr></thead><tbody>`+
+    d.strategies.map(s=>`<tr><td style="text-align:left;white-space:normal"><b>${esc(s.move)}</b><br><span class="note">${esc(s.mechanism)}</span></td>
+      <td>${s.score}</td><td>${s.toxin_after}</td><td>${s.flux_after}</td><td style="text-align:left;white-space:normal">${s.known_drugs.length?esc([...new Set(s.known_drugs)].join(", ")):"—"}</td></tr>`).join("")+
+    `</tbody></table></div>`+
+    (d.combinations&&d.combinations.length?`<h4 style="margin:14px 0 4px">Combinations of the best single moves</h4><div class="tablewrap"><table><thead><tr><th>Combination</th><th>Score</th><th>Best single alone</th><th>${esc(d.toxin||"toxin")} after</th></tr></thead><tbody>`+
+      d.combinations.map(c=>`<tr><td style="text-align:left;white-space:normal">${esc(c.move)}</td><td>${c.score}</td><td>${c.best_single}</td><td>${c.toxin_after}</td></tr>`).join("")+
+      `</tbody></table></div><p class="note">A combination scoring above its best single move means the two work together; scoring below means they interfere.</p>`:"")+
+    (d.off_target&&d.off_target.pathways&&Object.keys(d.off_target.pathways).length?`<h4 style="margin:14px 0 4px">What the best drug-like move does elsewhere</h4><p>${esc(d.off_target.move)} also moves: ${Object.entries(d.off_target.pathways).map(([k,v])=>`<b>${esc(k)}</b> (${v.map(esc).join(", ")})`).join("; ")}. These are the model's version of side effects.</p>`:"")+
+    `<p class="note">These are moves inside a model with illustrative rate constants, not treatment advice. Their value is in showing which kind of approach the network structure favours, and where the model agrees with treatments that already exist.</p>`;
+  out.innerHTML=h;
+}
+async function runDeeper(pid){
+  const box=$("#pwdeepbody"); box.innerHTML=`<p class="note">Measuring: this runs the pathway many times and takes a few seconds…</p>`;
+  let d;try{d=await api(`/api/pathways/${pid}/deeper`)}catch(e){box.innerHTML=`<p class="err">${esc(e.message)}</p>`;return}
+  const cc=d.control, mx=Math.max(...cc.coefficients.map(c=>Math.abs(c.control)),1e-9);
+  const w=660,rowh=22,p=250,h=cc.coefficients.length*rowh+30;
+  let g=`<line x1="${p}" y1="10" x2="${p}" y2="${h-16}" stroke="var(--rule)"/>`;
+  cc.coefficients.forEach((c,i)=>{const len=(w-p-30)*Math.abs(c.control)/mx*0.5;
+    g+=`<rect x="${c.control>=0?p:Math.max(p-len,110)}" y="${12+i*rowh}" width="${Math.max(len,1)}" height="${rowh-8}" rx="3" fill="${c.control>=0?"var(--coop)":"var(--broken)"}"><title>${esc(c.enzyme)}: ${c.control}</title></rect>
+      <text x="6" y="${24+i*rowh}" font-size="10.5" fill="var(--muted)">${esc(c.enzyme)}</text>
+      <text x="${(c.control>=0?p+len:p-len)+(c.control>=0?6:-6)}" y="${24+i*rowh}" font-size="10" text-anchor="${c.control>=0?"start":"end"}" fill="var(--muted)">${c.control}</text>`});
+  box.innerHTML=`<div class="report">${d.notes.map(n=>`<p>${esc(n)}</p>`).join("")}</div>
+    <div>${[["backbone monotone",d.backbone.consistent?"yes":"no"],["steady states found",d.steady_states.distinct],["starting points",d.steady_states.tries],["concentration-robust species",d.acr.robust.length]].map(([k,v])=>`<span class="pill">${k}: <b>${v}</b></span>`).join("")}</div>
+    ${d.acr.sensitive.length?`<p class="note">Most sensitive to how much material there is: ${d.acr.sensitive.map(x=>`${esc(x.species)} (${Math.round(x.spread*100)}%)`).join(", ")}.</p>`:""}
+    <figure class="chart"><figcaption>Flux control over ${esc(cc.target_name)}: how much the output flux moves when each enzyme is changed. Green raises it, red lowers it.</figcaption>
+      <svg viewBox="0 0 ${w} ${h}" style="max-width:${w}px" role="img" aria-label="Flux control coefficients">${g}</svg></figure>`;
+}
+async function runPathway(pid,kd){
+  const out=document.querySelector(".pwout"); out.innerHTML=`<p class="note">Simulating…</p>`;
+  const d=await api(`/api/pathways/${pid}/simulate?steps=2500${kd?`&knockdown=${kd}`:""}`);
+  const S=d.species,tr=d.trace,mx=Math.max(...tr.flat(),1e-9),w=900,h=300,p=46;
+  const keep=S.map((s,i)=>[s,i,Math.max(...tr.map(r=>r[i]))]).sort((a,b)=>b[2]-a[2]).slice(0,10);
+  const X=t=>p+(w-10-p)*t/(tr.length-1),Y=v=>h-40-(h-70)*v/mx;
+  let g=axes(w,h,p,tr.length,0,mx,"time",v=>v.toFixed(2)),legend="";
+  keep.forEach(([s,i],k)=>{g+=`<polyline fill="none" stroke="${wellColor(k)}" stroke-width="1.7" points="${tr.map((r,t)=>X(t).toFixed(1)+","+Y(r[i]).toFixed(1)).join(" ")}"><title>${esc(s)}</title></polyline>`;
+    legend+=`<span><i class="dot" style="background:${wellColor(k)}"></i> ${esc(s)}</span>`});
+  $("#pwnote").textContent=(kd?`Enzyme ${kd} knocked down to 20% of its activity. `:"Normal pathway. ")+(d.steady?"The pathway reached a steady state.":"The pathway had not settled by the end of the run.");
+  out.innerHTML=`<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Pathway time courses">${g}</svg><div class="legend">${legend}</div>
+    <p class="note">Fluxes at the end: ${Object.entries(d.flux).map(([k,v])=>`${esc(k)} ${v}`).join(", ")}.</p>`;
+}
+
+let RS={init:false,results:[],paper:null,reading:null};
+async function initResearch(){
+  const st=await api("/api/research/status");
+  $("#rsstatus").innerHTML=st.claude?`Papers are read by Claude (${esc(st.model)}).`:`Papers are read by keyword. <a href="#" id="rsset">Add an Anthropic key in Settings</a> to have Claude read the actual mechanism and numbers.`;
+  const rl=$("#rsset"); if(rl) rl.onclick=e=>{e.preventDefault();openSettings()};
+  const lib=await api("/api/research/templates");
+  $("#rslib").innerHTML=lib.map(t=>`<li><button data-t="${t.id}"><span class="nm">${esc(t.name)}</span><span class="sub">${esc(t.family)}, ${t.species.length} species</span></button></li>`).join("");
+  document.querySelectorAll("#rslib button").forEach(b=>b.onclick=()=>showTemplate(lib.find(t=>t.id===b.dataset.t)));
+  listResearchModels();
+  if(!RS.init){RS.init=true;$("#rsform").onsubmit=searchResearch}
+}
+async function listResearchModels(){
+  const ms=await api("/api/research/models");
+  $("#rsmodels").innerHTML=ms.length?ms.map(m=>`<li><button data-id="${m.id}"><span class="nm">${esc(m.name)}</span><span class="sub">${esc(m.family||"custom")}: ${esc(m.verdict||"")}</span></button></li>`).join(""):`<li class="note">Models you build from papers appear here.</li>`;
+  document.querySelectorAll("#rsmodels button").forEach(b=>b.onclick=async()=>showModel(await api("/api/research/models/"+b.dataset.id)));
+}
+async function searchResearch(e){
+  e.preventDefault();
+  const f=new FormData(e.target),q=new URLSearchParams({q:f.get("q")||"",n:f.get("n")||15,preprints:f.get("preprints")?"true":"false",oa:f.get("oa")?"true":"false"});
+  if(f.get("since")) q.set("since",f.get("since"));
+  $("#main").innerHTML=`<p class="note">Searching Europe PMC…</p>`;
+  try{RS.results=await api("/api/research/search?"+q)}catch(err){$("#main").innerHTML=`<div class="err">${esc(err.message)}</div>`;return}
+  $("#main").innerHTML=`<div class="runhead"><div><h2>${RS.results.length} papers</h2><p class="note">Newest first, from PubMed, PMC and preprint servers. Pick one to read its math.</p></div></div>`+
+    RS.results.map((p,i)=>`<div class="report" style="margin-bottom:10px"><h3 style="margin:0 0 4px">${esc(p.title)}</h3>
+      <p class="note">${esc(p.authors||"")}${p.journal?", "+esc(p.journal):""}${p.year?", "+esc(p.year):""}${p.preprint?", preprint (not peer reviewed)":""}</p>
+      <p>${esc((p.abstract||"No abstract available.").slice(0,380))}${(p.abstract||"").length>380?"…":""}</p>
+      <div class="actions"><button class="btn ghost" data-i="${i}">Read the math</button>${p.link?`<a href="${esc(p.link)}" target="_blank" rel="noopener">Open paper</a>`:""}</div></div>`).join("");
+  document.querySelectorAll("#main [data-i]").forEach(b=>b.onclick=()=>openPaper(RS.results[+b.dataset.i]));
+}
+function openPaper(p){
+  RS.paper=p;
+  $("#main").innerHTML=`<div class="runhead"><div><h2>${esc(p.title)}</h2><p class="note">${esc(p.authors||"")}${p.year?", "+esc(p.year):""}${p.preprint?", preprint":""}</p></div>
+      <div class="actions">${p.link?`<a href="${esc(p.link)}" target="_blank" rel="noopener">Open paper</a>`:""}</div></div>
+    <div class="report"><p>${esc(p.abstract||"No abstract available.")}</p></div>
+    <h3 class="sub">Add the methods section (optional)</h3>
+    <p class="note">Abstracts rarely contain the equations. Pasting the paper's methods or model section lets the reader see the actual mechanism and parameter values.</p>
+    <textarea id="rstext" rows="6" style="width:100%;border:1px solid var(--rule);border-radius:8px;background:var(--surface);color:var(--ink);padding:10px;font:inherit"></textarea>
+    <div class="modelhead" style="margin-top:8px"><button class="btn" id="rsread">Read the math</button></div>
+    <div id="rsreading"></div>`;
+  $("#rsread").onclick=readPaper;
+}
+async function readPaper(){
+  const box=$("#rsreading"); box.innerHTML=`<p class="note">Reading…</p>`;
+  let d;try{d=await api("/api/research/read",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({paper:RS.paper,text:$("#rstext").value||""})})}catch(e){box.innerHTML=`<div class="err">${esc(e.message)}</div>`;return}
+  RS.reading=d;
+  let h=`<h3 class="sub">What the math looks like</h3><div class="report">`;
+  if(d.reader==="claude"){
+    h+=`<p><b>Read by Claude</b> (${esc(d.confidence)} confidence). ${esc(d.summary||"")}</p>`;
+    h+=d.family?`<p>Model family: <b>${esc(d.family)}</b>.</p>`:`<p>No model family fitted.</p>`;
+    if(d.stated_parameters.length) h+=`<p><b>Numbers the paper states:</b></p><ul>${d.stated_parameters.map(x=>`<li>${esc(x.name)} = ${x.value} ${esc(x.unit)}: <span class="note">"${esc(x.sentence)}"</span></li>`).join("")}</ul>`;
+    if(d.caveats.length) h+=`<p class="note">Caveats: ${d.caveats.map(esc).join(" ")}</p>`;
+  } else {
+    h+=d.matches&&d.matches.length?`<p><b>Read by keyword.</b> The paper points to: ${d.matches.map(m=>`<b>${esc(m.name)}</b> (${m.hits.map(esc).join(", ")})`).join("; ")}.</p>`:`<p>No model family recognised in this text.</p>`;
+    if(d.stated_numbers&&d.stated_numbers.length) h+=`<p><b>Sentences with numbers you may want to set by hand:</b></p><ul>${d.stated_numbers.map(x=>`<li class="note">${esc(x)}</li>`).join("")}</ul>`;
+    h+=`<p class="note">${esc(d.caveat)}</p>`;
+  }
+  h+=`</div>`;
+  if(d.recipe) h+=`<div class="modelhead"><button class="btn" id="rsbuild">Build and test the model</button></div>`;
+  box.innerHTML=h;
+  const b=$("#rsbuild"); if(b) b.onclick=async()=>{b.disabled=true;b.textContent="Building…";
+    try{showModel(await api("/api/research/models",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({paper:RS.paper,reading:RS.reading,recipe:RS.reading.recipe})}));listResearchModels()}
+    catch(e){box.insertAdjacentHTML("beforeend",`<div class="err">${esc(e.message)}</div>`);b.disabled=false}};
+}
+function showTemplate(t){
+  $("#main").innerHTML=`<div class="runhead"><div><h2>${esc(t.name)}</h2><p class="note">${esc(t.family)}. ${esc(t.reference)}</p></div></div>
+    <div class="report"><p>${esc(t.description)}</p></div>
+    <div class="tablewrap"><table><thead><tr><th>Step</th><th>Rate law</th><th>Default rate</th></tr></thead><tbody>${t.reactions.map(r=>`<tr><td style="text-align:left">${esc(r.name)}</td><td>${esc(r.law)}</td><td>${r.rate}</td></tr>`).join("")}</tbody></table></div>
+    <div class="modelhead" style="margin-top:12px"><button class="btn" id="tplbuild">Build and test</button></div>`;
+  $("#tplbuild").onclick=async()=>{showModel(await api("/api/research/models/template",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({template:t.id})}));listResearchModels()};
+}
+function showModel(m){
+  const f=m.feasibility;
+  let h=`<div class="runhead"><div><h2>${esc(m.name)}</h2><p class="note">${esc(m.family||"custom")} model${m.paper&&m.paper.link?`, from <a href="${esc(m.paper.link)}" target="_blank" rel="noopener">the paper</a>`:""}.</p></div>
+      <div class="actions"><button class="btn ghost" id="rsdel">Delete</button></div></div>
+    <div class="report"><h3 style="margin-top:0">${esc(f.verdict)}</h3>
+      <ul>${f.checks.map(c=>`<li>${c.ok?"✓":"✗"} ${esc(c.check)}${c.detail?` <span class="note">${esc(c.detail)}</span>`:""}</li>`).join("")}</ul>
+      ${f.notes.map(n=>`<p class="note">${esc(n)}</p>`).join("")}</div>
+    <figure class="chart rschart"></figure>
+    <div class="modelhead"><button class="btn" id="rsopen">Study it in Pathways</button><button class="btn ghost" id="rscanvas">Open on the Models canvas</button></div>
+    <p class="note">In Pathways the model gets the network view, what-if on every step, the therapy search and Cypher export. On the canvas it becomes a layer you can wire into a larger model and export as code.</p>
+    <h3 class="sub">Find drug targets</h3>
+    <p class="note">Choose the quantity you want to move. Every step is blocked to 30% and boosted to 300% in turn, and ranked by how far it moves that quantity, averaged over the whole run. Side effects are the other quantities that move most.</p>
+    <div class="modelhead"><select id="tgsp">${f.species.map(x=>`<option>${esc(x)}</option>`).join("")}</select>
+      <select id="tgdir"><option value="lower">lower it</option><option value="raise">raise it</option></select>
+      <button class="btn ghost" id="tgrun">Rank the steps</button></div><div id="tgout"></div>
+    <h3 class="sub">Steps in the model</h3>
+    <div class="tablewrap"><table><thead><tr><th>Step</th><th>Reaction</th><th>Law</th><th>Rate</th><th>Evidence</th></tr></thead><tbody>
+    ${m.reactions.map(r=>`<tr><td style="text-align:left">${esc(r.name)}</td><td style="text-align:left">${esc(Object.entries(r.substrates).map(([k,v])=>v>1?v+" "+k:k).join(" + ")||"∅")} → ${esc(Object.entries(r.products).map(([k,v])=>v>1?v+" "+k:k).join(" + ")||"∅")}</td><td>${esc(r.law)}</td><td>${r.rate}</td><td style="text-align:left;white-space:normal" class="note">${esc(r.evidence||"")}</td></tr>`).join("")}</tbody></table></div>`;
+  $("#main").innerHTML=h;
+  const tr=f.trace,S=f.species;
+  if(tr&&tr.length){const mx=Math.max(...tr.flat(),1e-9),w=900,hh=280,p=46,X=t=>p+(w-10-p)*t/(tr.length-1),Y=v=>hh-40-(hh-70)*v/mx;
+    let g=axes(w,hh,p,tr.length,0,mx,"time",v=>v.toFixed(2)),lg="";
+    S.forEach((s,i)=>{g+=`<polyline fill="none" stroke="${wellColor(i)}" stroke-width="1.8" points="${tr.map((r,t)=>X(t).toFixed(1)+","+Y(r[i]).toFixed(1)).join(" ")}"/>`;lg+=`<span><i class="dot" style="background:${wellColor(i)}"></i> ${esc(s)}</span>`});
+    document.querySelector(".rschart").innerHTML=`<svg viewBox="0 0 ${w} ${hh}" role="img" aria-label="Model time course">${g}</svg><div class="legend">${lg}</div>`}
+  $("#tgrun").onclick=async()=>{const out=$("#tgout");out.innerHTML=`<p class="note">Trying every step…</p>`;
+    try{const d=await api(`/api/pathways/${m.pid}/targets?species=${encodeURIComponent($("#tgsp").value)}&direction=${$("#tgdir").value}`);
+      out.innerHTML=`<p>Average ${esc(d.species)} with nothing changed: ${d.baseline}.</p><div class="tablewrap"><table><thead><tr><th>Move</th><th>${esc(d.species)} after</th><th>Change</th><th>Side effects</th><th>Real interventions here</th></tr></thead><tbody>`+
+        d.moves.slice(0,10).map(x=>`<tr><td style="text-align:left;white-space:normal">${esc(x.move)}</td><td>${x.level}</td><td>${x.change>0?"+":""}${Math.round(x.change*100)}%</td>
+          <td style="text-align:left;white-space:normal">${x.side_effects.map(se=>`${esc(se.species)} ${se.change>0?"+":""}${Math.round(se.change*100)}%`).join(", ")||"—"}</td>
+          <td style="text-align:left;white-space:normal">${esc(x.known_drugs.join(", "))||"—"}</td></tr>`).join("")+`</tbody></table></div>`;
+    }catch(e){out.innerHTML=`<div class="err">${esc(e.message)}</div>`}};
+  $("#rsopen").onclick=()=>{setView("pathways");setTimeout(()=>openPathway(m.pid),300)};
+  $("#rscanvas").onclick=async()=>{WSMETA=null;await listWorkspaces();const w=await api("/api/workspaces",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({pathway:m.pid})});setView("models");setTimeout(()=>openWorkspace(w.id),300)};
+  $("#rsdel").onclick=async()=>{if(!confirm("Delete this research model?"))return;await api("/api/research/models/"+m.id,{method:"DELETE"});listResearchModels();$("#main").innerHTML=`<div class="empty"><h2>Deleted</h2></div>`};
+}
+const SRC={app:"saved in the app",environment:"from the server environment",default:"not set"};
+$("#setbtn").onclick=openSettings;
+async function openSettings(){
+  document.querySelectorAll("#nav button").forEach(b=>b.setAttribute("aria-current","false"));
+  const d=await api("/api/settings"), ro=!d.can_edit;
+  const field=(name,label,type="text",ph="")=>`<label>${label}<input data-k="${name}" type="${type}" autocomplete="off" spellcheck="false" placeholder="${esc(d[name].secret&&d[name].set?d[name].value:ph)}" value="${d[name].secret?"":esc(d[name].value||"")}" ${ro?"disabled":""}></label>`;
+  $("#main").innerHTML=`<div class="runhead"><div><h2>Settings</h2><p class="note">Stored on this server in data/settings.json, readable only by your user account, and never pushed to GitHub. Keys are never sent back to the browser in full. A value saved here takes precedence over the matching environment variable.</p></div></div>
+    ${ro?`<div class="err">You are viewing this through the public address without Cloudflare Access, so settings are read-only here. Change them from the Mac itself at http://127.0.0.1:47431, or put an Access policy on fml.fueldeskpro.com.</div>`:""}
+    <div class="report" style="margin-top:14px"><h3 style="margin-top:0">Anthropic</h3>
+      <p class="note">Used by the Research tab to read the math out of papers. Current key: ${d.anthropic_api_key.set?`<b>${esc(d.anthropic_api_key.value)}</b>, ${SRC[d.anthropic_api_key.source]}`:"none"}.</p>
+      <div class="fields">${field("anthropic_api_key","API key","password","sk-ant-…")}
+        <label>Model<select data-k="anthropic_model" ${ro?"disabled":""}>${d.models.map(m=>`<option ${m===d.anthropic_model.value?"selected":""}>${esc(m)}</option>`).join("")}</select></label></div>
+      <div class="actions"><button class="btn" data-save="anthropic" ${ro?"disabled":""}>Save</button><button class="btn ghost" id="testant" ${ro?"disabled":""}>Test the key</button>
+        <button class="btn ghost" data-clear="anthropic_api_key" ${ro?"disabled":""}>Remove the key</button><span class="note" id="antnote"></span></div></div>
+    <div class="report" style="margin-top:14px"><h3 style="margin-top:0">Neo4j</h3>
+      <p class="note">Used by Push to Neo4j and Query Neo4j on the Pathways tab. Password: ${d.neo4j_password.set?`set, ${SRC[d.neo4j_password.source]}`:"not set"}.</p>
+      <div class="fields">${field("neo4j_uri","Address","text","neo4j+s://xxxx.databases.neo4j.io")}${field("neo4j_user","User")}
+        ${field("neo4j_password","Password","password")}${field("neo4j_database","Database")}</div>
+      <div class="actions"><button class="btn" data-save="neo4j" ${ro?"disabled":""}>Save</button><button class="btn ghost" id="testneo" ${ro?"disabled":""}>Test the connection</button>
+        <button class="btn ghost" data-clear="neo4j_password" ${ro?"disabled":""}>Remove the password</button><span class="note" id="neonote"></span></div></div>`;
+  const groups={anthropic:["anthropic_api_key","anthropic_model"],neo4j:["neo4j_uri","neo4j_user","neo4j_password","neo4j_database"]};
+  document.querySelectorAll("[data-save]").forEach(b=>b.onclick=async()=>{
+    const values={};for(const k of groups[b.dataset.save]){const el=document.querySelector(`[data-k="${k}"]`);values[k]=el.value}
+    const note=b.dataset.save==="anthropic"?$("#antnote"):$("#neonote");
+    try{await api("/api/settings",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({values})});note.textContent="Saved.";setTimeout(openSettings,700)}
+    catch(e){note.textContent=e.message}});
+  document.querySelectorAll("[data-clear]").forEach(b=>b.onclick=async()=>{
+    if(!confirm("Remove it from the app? The server environment value, if any, will be used instead."))return;
+    await api("/api/settings",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({clear:[b.dataset.clear]})});openSettings()});
+  const t1=$("#testant"); if(t1) t1.onclick=async()=>{$("#antnote").textContent="Testing…";
+    try{const r=await api("/api/settings/test/anthropic",{method:"POST"});$("#antnote").textContent=`The key works with ${r.model}.`}catch(e){$("#antnote").textContent=e.message}};
+  const t2=$("#testneo"); if(t2) t2.onclick=async()=>{$("#neonote").textContent="Testing…";
+    try{const r=await api("/api/settings/test/neo4j",{method:"POST"});$("#neonote").textContent=`Connected to ${r.uri}.`}catch(e){$("#neonote").textContent=e.message}};
+}
+init().catch(e=>{$("#main").innerHTML=`<div class="empty"><h2>Server not reachable</h2><p>${esc(e.message)}. Check that the service is running, then reload.</p></div>`});
+</script>
+</body>
+</html>

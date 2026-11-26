@@ -31,7 +31,9 @@ def _scales():
     """Scales with runtime detail for the UI: the live Molecular scale opens the
     real-time cell view; the linked Intracellular scale opens Fate Memory Lab
     (URL from DDD_FATE_URL in .env, if set)."""
-    fate = os.environ.get("DDD_FATE_URL", "").strip() or "https://fml.fueldeskpro.com"
+    # Fate Memory Lab is now merged into ddd and served at /fml; the rule-engine
+    # (Pathways) view is the Intracellular scale. DDD_FATE_URL still overrides.
+    fate = os.environ.get("DDD_FATE_URL", "").strip() or "/fml/#pathways"
     out = []
     for s in SCALES:
         s = copy.deepcopy(s)
