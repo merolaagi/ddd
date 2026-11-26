@@ -224,10 +224,32 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:
 #tourCard .count{font-size:11px;color:var(--muted);margin-right:auto;font-family:"JetBrains Mono",monospace}
 @media(max-width:560px){#tourCard{left:16px;right:16px;bottom:16px;max-width:none}}
 
+/* ---- swarm live overlay ---- */
+.sov{position:fixed;inset:0;background:rgba(20,22,24,.5);display:none;z-index:120;align-items:center;justify-content:center}
+.sov.on{display:flex}
+.sov-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;width:min(1060px,95vw);height:min(690px,92vh);display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.22)}
+.sov-h{display:flex;align-items:center;gap:10px;padding:13px 18px;border-bottom:1px solid var(--line)}
+.sov-h .dot{width:8px;height:8px;border-radius:50%;background:var(--ok);animation:spulse 1.1s infinite}
+.sov-h h3{margin:0;font-family:"Inter",sans-serif;font-weight:600;font-size:15px}
+.sov-h .cnt{color:var(--muted);font-size:12px}
+.sov-h .x{margin-left:auto;background:none;border:0;color:var(--muted);font-size:22px;line-height:1;cursor:pointer;padding:0}
+.sov-body{flex:1;display:flex;min-height:0}
+#swarmGraph{flex:1;min-width:0;min-height:0;background:var(--bg)}
+.sov-side{width:336px;border-left:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+.sov-side h4{margin:0;padding:11px 15px 6px;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+#swarmActs{flex:1;overflow:auto;padding:0 15px 12px}
+.sact{display:flex;gap:8px;font-size:12.5px;padding:5px 0;border-bottom:1px solid var(--line);line-height:1.45}
+.sact .i{flex:0 0 15px;text-align:center;color:var(--accent);font-weight:700}
+.sact.lead .i{color:var(--accent)} .sact.err .i{color:var(--bad)} .sact.done .i{color:var(--ok)}
+.sact .tm{margin-left:auto;color:var(--muted);font-size:11px;white-space:nowrap;padding-left:6px}
+.sov-legend{display:flex;gap:14px;flex-wrap:wrap;padding:8px 15px;border-top:1px solid var(--line);font-size:11px;color:var(--muted)}
+.sov-legend b{font-weight:700}
+@keyframes spulse{0%,100%{opacity:1}50%{opacity:.3}}
 </style>
 <script>(function(){try{var t=localStorage.getItem("ddd-theme")||"light";document.documentElement.setAttribute("data-theme",t);}catch(e){document.documentElement.setAttribute("data-theme","light");}})();</script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/static/ink-skin.css?v=0.32.0">
+<script src="/static/vendor/vis-network.min.js"></script>
 </head>
 <body>
 <header class="top"><div class="wrap bar">
@@ -263,7 +285,8 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:
       </div>
       <div id="swarmStats" class="muted" style="font-size:13px;margin:8px 0 0;line-height:1.6"></div>
       <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
-        <button onclick="tickNow()">Run a tick now</button>
+        <button onclick="openSwarmLive()">▸ Live view</button>
+        <button onclick="tickNow()" class="theme-btn">Run a tick now</button>
         <button onclick="toggleSwarm()" id="swarmToggle" class="theme-btn">Pause</button>
       </div>
       <div id="swarmAgents" style="margin-top:12px"></div>
@@ -519,6 +542,59 @@ async function toggleSwarm(){ const st=await api("/api/swarm/status"); await api
 async function markAllRead(){ await api("/api/swarm/mark_read",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({ids:null})}); loadSwarm(); }
 function openRep(name){ if(typeof openReport==="function"){openReport(name);} else { fetch("/api/company/reports/"+encodeURIComponent(name)).then(r=>r.text()).then(t=>{$("viewer").textContent=t;$("viewer").scrollIntoView({behavior:"smooth"});}); } }
 
+/* ---- swarm live overlay: real-time agent graph + activity feed ---- */
+var SGRAPH=null, SNODES=null, SEDGES=null, sLiveTimer=null;
+function nodeStyle(n){
+  if(n.kind==="supervisor") return {shape:"hexagon",color:{background:"#b07a1e",border:"#7a520a"},size:26,font:{color:"#ffffff",size:14,face:"Inter",bold:{color:"#fff"}}};
+  if(n.kind==="agent") return {shape:"diamond",color:{background:"#f7e9cc",border:"#b07a1e"},size:19,font:{size:12,face:"Inter",color:"#7a520a"}};
+  if(n.kind==="running") return {shape:"dot",color:{background:"#2f5fd0",border:"#213ba6"},size:17,font:{size:12,face:"Inter",color:"#262626"}};
+  return {shape:"dot",color:{background:"#e9e9e6",border:"#b6b6b2"},size:11,font:{size:11,color:"#9a9a9a",face:"Inter"}};
+}
+function nodeLabel(n){
+  var l=(n.label||n.id);
+  if(n.kind==="running"&&n.progress){ var p=n.progress; l+="\n"+(p.length>36?p.slice(0,35)+"…":p); }
+  return l;
+}
+function openSwarmLive(){
+  $("swarmLive").classList.add("on");
+  if(!SGRAPH && window.vis){
+    SNODES=new vis.DataSet(); SEDGES=new vis.DataSet();
+    SGRAPH=new vis.Network($("swarmGraph"),{nodes:SNODES,edges:SEDGES},{
+      physics:{stabilization:false,barnesHut:{gravitationalConstant:-3200,springLength:130,springConstant:.04,damping:.3}},
+      interaction:{hover:true,dragNodes:true,zoomView:true},
+      edges:{color:{color:"#dad9d5",highlight:"#b07a1e"},smooth:{type:"continuous"},arrows:{to:{enabled:true,scaleFactor:.5}},width:1},
+      nodes:{borderWidth:2,shadow:false}
+    });
+    SGRAPH.on("doubleClick",function(p){ if(p.nodes[0]){var n=SNODES.get(p.nodes[0]); if(n&&n.run_id&&typeof openRun==="function"){closeSwarmLive();openRun(n.run_id);}}});
+  }
+  sFitted=false;
+  swarmLiveTick();
+  setTimeout(function(){ if(SGRAPH){SGRAPH.setSize("100%","100%");SGRAPH.redraw();SGRAPH.fit({animation:false});} },80);
+  if(sLiveTimer) clearInterval(sLiveTimer);
+  sLiveTimer=setInterval(swarmLiveTick,2500);
+}
+var sFitted=false;
+function closeSwarmLive(){ $("swarmLive").classList.remove("on"); if(sLiveTimer){clearInterval(sLiveTimer);sLiveTimer=null;} }
+async function swarmLiveTick(){
+  let L; try{ L=await api("/api/swarm/live"); }catch(e){ return; }
+  const c=L.counts||{};
+  $("swarmLiveCnt").textContent=(L.enabled?"live":"paused")+" · "+(c.running||0)+" running · "+(c.pending||0)+" queued · "+(c.agents||0)+" agents";
+  if(SNODES){
+    const ids=L.nodes.map(n=>n.id);
+    SNODES.getIds().filter(id=>!ids.includes(id)).forEach(id=>SNODES.remove(id));
+    L.nodes.forEach(n=>{ const st=nodeStyle(n); SNODES.update(Object.assign({id:n.id,label:nodeLabel(n),run_id:n.run_id,title:(n.sub||"")+(n.progress?(" — "+n.progress):(n.reason?(" — "+n.reason):""))},st)); });
+    const eids=L.edges.map(e=>e.from+"->"+e.to);
+    SEDGES.getIds().filter(id=>!eids.includes(id)).forEach(id=>SEDGES.remove(id));
+    L.edges.forEach(e=>SEDGES.update({id:e.from+"->"+e.to,from:e.from,to:e.to,dashes:e.kind==="spawn"}));
+    if(!sFitted && SNODES.length){ sFitted=true; setTimeout(function(){SGRAPH.fit({animation:false});},120); }
+  }
+  $("swarmActs").innerHTML=(L.activity||[]).map(a=>{
+    const cls=a.icon==="★"?"lead":(a.icon==="✗"?"err":(a.icon==="✓"?"done":""));
+    const tm=a.t?new Date(a.t*1000).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}):"";
+    return '<div class="sact '+cls+'"><span class="i">'+a.icon+'</span><span>'+esc(a.text)+'</span><span class="tm">'+tm+'</span></div>';
+  }).join("") || '<p class="muted" style="font-size:12px;padding-top:6px">No activity yet — the supervisor will fill this as agents run.</p>';
+}
+
 loadOverview().then(loadFeed); loadScheds(); loadIndex(); loadSwarm();
 setInterval(() => { loadOverview(); loadScheds(); loadSwarm(); }, 20000);
 </script>
@@ -565,5 +641,23 @@ function tourGo(i){
 
 </script>
 <script>function toggleTheme(){var h=document.documentElement;var n=h.getAttribute("data-theme")==="dark"?"light":"dark";h.setAttribute("data-theme",n);try{localStorage.setItem("ddd-theme",n);}catch(e){}paintThemeBtn();}function paintThemeBtn(){var b=document.getElementById("themeBtn");if(b)b.textContent=document.documentElement.getAttribute("data-theme")==="dark"?"\u2600 Light":"\u263e Dark";}paintThemeBtn();</script>
+<div class="sov" id="swarmLive">
+  <div class="sov-card">
+    <div class="sov-h"><span class="dot"></span><h3>Swarm · live</h3><span class="cnt" id="swarmLiveCnt"></span>
+      <button class="x" onclick="closeSwarmLive()">×</button></div>
+    <div class="sov-body">
+      <div style="flex:1;display:flex;flex-direction:column;min-width:0;min-height:0">
+        <div id="swarmGraph"></div>
+        <div class="sov-legend">
+          <span><b style="color:#b07a1e">◆</b> supervisor</span>
+          <span><b style="color:#b07a1e">◇</b> dynamic agent</span>
+          <span><b style="color:#2f5fd0">●</b> running</span>
+          <span><b style="color:#9a9a9a">○</b> queued</span>
+        </div>
+      </div>
+      <div class="sov-side"><h4>Activity</h4><div id="swarmActs"></div></div>
+    </div>
+  </div>
+</div>
 </body>
 </html>

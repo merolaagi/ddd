@@ -306,6 +306,12 @@ def api_swarm_status():
     return swarm.status()
 
 
+@app.get("/api/swarm/live")
+def api_swarm_live():
+    from .company import swarm
+    return swarm.live()
+
+
 @app.post("/api/swarm/tick")
 def api_swarm_tick():
     from .company import swarm

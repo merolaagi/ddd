@@ -33,7 +33,7 @@ _STATE = COMPANY_DIR / "swarm.json"
 _DEFAULT_CFG = {
     "enabled": True,
     "batch_per_tick": 1,        # new runs dispatched per tick
-    "target_inflight": 2,       # keep this many tasks pending+running
+    "target_inflight": 1,       # keep this many tasks pending+running
     "max_dynamic_agents": 12,
     "escalate_leads": True,
     "escalate_findings": True,
@@ -344,6 +344,80 @@ def status():
         "dynamic_agents": s["dynamic_agents"],
         "stats": s["stats"],
         "escalations": sorted(s["escalations"], key=lambda e: (e["read"], -e["created"]))[:40],
+        "unread": len([e for e in s["escalations"] if not e["read"]]),
+    }
+
+
+def _last_log(run_id):
+    if not run_id:
+        return None
+    try:
+        row = db.run_get(run_id)
+        log = (row or {}).get("log") or ""
+        lines = [l for l in log.splitlines() if l.strip()]
+        if lines:
+            # strip the "[HH:MM:SS] " stamp
+            l = lines[-1]
+            return l.split("] ", 1)[1] if l.startswith("[") and "] " in l else l
+    except Exception:
+        return None
+    return None
+
+
+def live():
+    """Graph + progress + activity feed for the real-time swarm overlay."""
+    s = _load()
+    cfg = _cfg()
+    nodes = [{"id": "sup", "kind": "supervisor", "label": "Supervisor",
+              "sub": "Overseer", "progress": None}]
+    edges = []
+    agent_ids = {}
+    for a in s["dynamic_agents"]:
+        nid = "agent:" + a["name"]
+        agent_ids[a["name"]] = nid
+        nodes.append({"id": nid, "kind": "agent", "label": a["name"],
+                      "sub": a["playbook"], "reason": a.get("reason"), "progress": None})
+        edges.append({"from": "sup", "to": nid, "kind": "spawn"})
+    for t in s["queue"]:
+        if t["status"] not in ("running", "pending"):
+            continue
+        nid = t["id"]
+        nodes.append({"id": nid, "kind": t["status"], "playbook": t["playbook"],
+                      "label": t["playbook"].replace("_", " "),
+                      "sub": t.get("label"),
+                      "progress": _last_log(t.get("run_id")) if t["status"] == "running" else None,
+                      "run_id": t.get("run_id")})
+        src = agent_ids.get(t.get("origin"), "sup")
+        edges.append({"from": src, "to": nid, "kind": "dispatch"})
+
+    # activity feed — chronological events the swarm produced
+    acts = []
+    for t in s["queue"]:
+        if t.get("created"):
+            acts.append({"t": t["created"], "icon": "▶",
+                         "text": f"dispatch {t['playbook']} · {t.get('label','')[:48]}"})
+        if t.get("finished") and t["status"] == "done":
+            acts.append({"t": t["finished"], "icon": "✓", "text": f"done {t['playbook']}"})
+        elif t.get("finished") and t["status"] == "error":
+            acts.append({"t": t["finished"], "icon": "✗", "text": f"error {t['playbook']}"})
+    for a in s["dynamic_agents"]:
+        acts.append({"t": a.get("created", 0), "icon": "✦",
+                     "text": f"spawned {a['name']} — {a.get('reason','')[:60]}"})
+    for e in s["escalations"]:
+        acts.append({"t": e["created"], "icon": "★" if e["tier"] == "lead" else "•",
+                     "text": f"[{e['tier']}] {e['title']}"})
+    acts.sort(key=lambda x: x["t"] or 0, reverse=True)
+
+    return {
+        "enabled": cfg.get("enabled", True),
+        "stats": s["stats"],
+        "counts": {"running": len([n for n in nodes if n["kind"] == "running"]),
+                   "pending": len([n for n in nodes if n["kind"] == "pending"]),
+                   "agents": len(s["dynamic_agents"])},
+        "nodes": nodes,
+        "edges": edges,
+        "activity": acts[:40],
+        "escalations": sorted(s["escalations"], key=lambda e: (e["read"], -e["created"]))[:12],
         "unread": len([e for e in s["escalations"] if not e["read"]]),
     }
 
