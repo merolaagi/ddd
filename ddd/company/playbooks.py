@@ -384,6 +384,13 @@ def literature_discovery(ctx, disease: str = "", max_papers: int = 20,
                        max_compounds=int(max_compounds), design=bool(design))
 
 
+def swarm_tick(ctx, max_dispatch: int = 1):
+    """One heartbeat of the supervisor swarm: harvest finished runs, escalate what's
+    worthy, spawn specialist agents for gaps, top up and dispatch new work."""
+    from . import swarm
+    return swarm.tick(ctx, max_dispatch=int(max_dispatch))
+
+
 def discovery_mission(ctx, disease: str = "", max_targets_try: int = 4, want: int = 1,
                       design_n: int = 10, dock: bool = False):
     """Agents in tandem: read → scout → design, looping over targets until a drug-like

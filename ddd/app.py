@@ -300,6 +300,45 @@ def api_target_intel(target: str):
         raise HTTPException(502, f"target_intel: {str(e)[:200]}")
 
 
+@app.get("/api/swarm/status")
+def api_swarm_status():
+    from .company import swarm
+    return swarm.status()
+
+
+@app.post("/api/swarm/tick")
+def api_swarm_tick():
+    from .company import swarm
+    class _C:
+        def log(self, *a): pass
+    summary, lines = swarm.tick(_C())
+    return {"ok": True, "summary": summary}
+
+
+class MarkReadReq(BaseModel):
+    ids: list[str] | None = None
+
+
+@app.post("/api/swarm/mark_read")
+def api_swarm_mark_read(req: MarkReadReq):
+    from .company import swarm
+    return {"marked": swarm.mark_read(req.ids)}
+
+
+class SwarmCfgReq(BaseModel):
+    enabled: bool | None = None
+    escalate_leads: bool | None = None
+    escalate_findings: bool | None = None
+    email_alerts: bool | None = None
+    target_inflight: int | None = None
+
+
+@app.post("/api/swarm/configure")
+def api_swarm_configure(req: SwarmCfgReq):
+    from .company import swarm
+    return swarm.configure(**req.model_dump())
+
+
 @app.post("/api/analyst")
 def analyst(req: AnalystReq):
     from . import analyst as an

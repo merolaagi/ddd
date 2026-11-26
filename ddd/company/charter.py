@@ -39,6 +39,11 @@ DEFAULT = {
         {"label": "O3DC Benchmark Index", "url": "https://o3dc.org/"},
     ],
     "focus_diseases": ["idiopathic pulmonary fibrosis", "type 2 diabetes mellitus", "Alzheimer disease"],
+    "swarm": {
+        "enabled": True, "batch_per_tick": 1, "target_inflight": 2, "max_dynamic_agents": 12,
+        "escalate_leads": True, "escalate_findings": True, "email_alerts": True,
+        "baseline_worker": "discovery_mission",
+    },
 }
 
 _PATH = COMPANY_DIR / "charter.json"

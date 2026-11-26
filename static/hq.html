@@ -254,6 +254,29 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:
 
   <div class="kpis" id="kpis"></div>
 
+  <h2>Swarm <span class="muted" style="font-size:12px;font-weight:400">· agents working on their own</span></h2>
+  <div class="two">
+    <div class="panel">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <b style="font-size:14px">Supervisor</b>
+        <span id="swarmState" class="muted" style="font-size:12px"></span>
+      </div>
+      <div id="swarmStats" class="muted" style="font-size:13px;margin:8px 0 0;line-height:1.6"></div>
+      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+        <button onclick="tickNow()">Run a tick now</button>
+        <button onclick="toggleSwarm()" id="swarmToggle" class="theme-btn">Pause</button>
+      </div>
+      <div id="swarmAgents" style="margin-top:12px"></div>
+    </div>
+    <div class="panel">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <b style="font-size:14px">Escalations <span class="muted" style="font-weight:400" id="swarmUnread"></span></b>
+        <button onclick="markAllRead()" class="theme-btn" style="font-size:11px">Mark all read</button>
+      </div>
+      <div id="swarmInbox" class="feed" style="margin-top:8px"><p class="muted">Nothing yet. The supervisor escalates leads and notable findings here.</p></div>
+    </div>
+  </div>
+
   <h2>Departments</h2>
   <div class="depts" id="depts"></div>
 
@@ -466,8 +489,38 @@ async function loadIndex(){
   }).join("");
 }
 
-loadOverview().then(loadFeed); loadScheds(); loadIndex();
-setInterval(() => { loadOverview(); loadScheds(); }, 20000);
+async function loadSwarm(){
+  let st;
+  try{ st = await api("/api/swarm/status"); }catch(e){ $("swarmState").textContent="unavailable"; return; }
+  const f = st.inflight||{}, s = st.stats||{};
+  $("swarmState").textContent = (st.enabled ? "● live" : "○ paused");
+  $("swarmState").style.color = st.enabled ? "var(--ok)" : "var(--muted)";
+  $("swarmToggle").textContent = st.enabled ? "Pause" : "Resume";
+  const last = s.last_tick ? new Date(s.last_tick*1000).toLocaleTimeString() : "—";
+  $("swarmStats").innerHTML =
+    `<b>${f.running||0}</b> running · <b>${f.pending||0}</b> queued · <b>${(st.dynamic_agents||[]).length}</b> dynamic agents`
+    +`<br>${s.ticks||0} ticks · ${s.dispatched||0} dispatched · ${s.leads||0} leads · ${s.findings||0} findings · ${s.agents_spawned||0} spawned`
+    +`<br><span class="muted">last tick ${last} · every ${Math.round((st.config&&st.config.batch_per_tick)||1)}/tick</span>`;
+  const run = (st.running||[]).map(r=>`<span class="agent">${esc(r.playbook)}</span>`).join(" ");
+  const ag = (st.dynamic_agents||[]).map(a=>`<div style="font-size:12px;margin:3px 0"><span class="agent">${esc(a.name)}</span> <span class="muted">${esc(a.reason||"")}</span></div>`).join("");
+  $("swarmAgents").innerHTML = (run?`<div style="margin-bottom:8px">${run}</div>`:"") + (ag || '<span class="muted" style="font-size:12px">No dynamic agents spawned yet.</span>');
+  const es = st.escalations||[];
+  $("swarmUnread").textContent = st.unread ? `(${st.unread} new)` : "";
+  $("swarmInbox").innerHTML = es.length ? es.map(e=>{
+    const tier = e.tier==="lead" ? '<span style="color:var(--accent);font-weight:600">LEAD</span>' : '<span class="muted">finding</span>';
+    const when = new Date(e.created*1000).toLocaleString();
+    const dot = e.read ? "" : '<span style="color:var(--accent)">●</span> ';
+    const rep = e.report ? ` · <a href="#" onclick="openRep('${esc(e.report)}');return false">report</a>` : "";
+    return `<div style="padding:7px 0;border-bottom:1px solid var(--line)">${dot}${tier} <b>${esc(e.title)}</b><div class="muted" style="font-size:12px;margin-top:2px">${esc(e.detail)}</div><div class="muted" style="font-size:11px;margin-top:2px">${when}${rep}</div></div>`;
+  }).join("") : '<p class="muted">Nothing yet. The supervisor escalates leads and notable findings here.</p>';
+}
+async function tickNow(){ $("swarmState").textContent="ticking…"; try{ await api("/api/swarm/tick",{method:"POST"}); }catch(e){} loadSwarm(); loadFeed&&loadFeed(); }
+async function toggleSwarm(){ const st=await api("/api/swarm/status"); await api("/api/swarm/configure",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({enabled:!st.enabled})}); loadSwarm(); }
+async function markAllRead(){ await api("/api/swarm/mark_read",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({ids:null})}); loadSwarm(); }
+function openRep(name){ if(typeof openReport==="function"){openReport(name);} else { fetch("/api/company/reports/"+encodeURIComponent(name)).then(r=>r.text()).then(t=>{$("viewer").textContent=t;$("viewer").scrollIntoView({behavior:"smooth"});}); } }
+
+loadOverview().then(loadFeed); loadScheds(); loadIndex(); loadSwarm();
+setInterval(() => { loadOverview(); loadScheds(); loadSwarm(); }, 20000);
 </script>
 <script>
 

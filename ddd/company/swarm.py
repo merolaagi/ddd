@@ -1,0 +1,375 @@
+"""Swarm supervisor — a self-running research company.
+
+Worker agents (the department playbooks) grind on the focus diseases on their
+own. A supervisor loop (`tick`) keeps them busy, harvests their results, judges
+each against a tunable bar, escalates what's worthy to the founder (an HQ inbox
++ email), and when a worker comes up short it spawns a new specialist agent on
+the fly to attack the gap. Driven by a schedule, so it is always working while
+the server is up (and launchd keeps the server up).
+
+Design: dispatch-and-harvest, non-blocking. Each tick harvests the runs that
+finished since last time (score → escalate → spawn), tops the queue back up,
+and dispatches a small batch of new runs. Workers run as ordinary tracked runs
+(visible in HQ, each with its own report), bounded by the engine's 2-slot
+semaphore, so the swarm never stampedes the one Mac.
+
+Everything here is prioritisation over public data + reward-guided design — a
+place to look, not a validated lead.
+"""
+from __future__ import annotations
+
+import json
+import os
+import smtplib
+import time
+from email.message import EmailMessage
+
+from . import charter as charter_mod
+from . import db
+from .paths import COMPANY_DIR
+
+_STATE = COMPANY_DIR / "swarm.json"
+
+_DEFAULT_CFG = {
+    "enabled": True,
+    "batch_per_tick": 1,        # new runs dispatched per tick
+    "target_inflight": 2,       # keep this many tasks pending+running
+    "max_dynamic_agents": 12,
+    "escalate_leads": True,
+    "escalate_findings": True,
+    "email_alerts": True,
+    "baseline_worker": "discovery_mission",
+}
+
+
+# ---------------------------------------------------------------- state
+def _blank():
+    return {"queue": [], "dynamic_agents": [], "escalations": [],
+            "stats": {"ticks": 0, "dispatched": 0, "harvested": 0, "leads": 0,
+                      "findings": 0, "agents_spawned": 0, "errors": 0, "last_tick": None},
+            "seq": 0}
+
+
+def _load():
+    if _STATE.exists():
+        try:
+            s = json.loads(_STATE.read_text())
+            for k, v in _blank().items():
+                s.setdefault(k, v)
+            return s
+        except Exception:
+            pass
+    return _blank()
+
+
+def _save(s):
+    # keep history bounded
+    done = [t for t in s["queue"] if t["status"] in ("done", "error")]
+    live = [t for t in s["queue"] if t["status"] in ("pending", "running")]
+    s["queue"] = live + done[-60:]
+    s["escalations"] = s["escalations"][-120:]
+    try:
+        _STATE.write_text(json.dumps(s, indent=1))
+    except Exception:
+        pass
+
+
+def _cfg():
+    c = dict(_DEFAULT_CFG)
+    c.update((charter_mod.load().get("swarm") or {}))
+    return c
+
+
+def _nid(s, prefix):
+    s["seq"] += 1
+    return f"{prefix}{s['seq']}"
+
+
+# ---------------------------------------------------------------- scoring
+def _score(playbook: str, summary: dict) -> list:
+    """What, if anything, in this result is worth the founder's attention."""
+    s = summary or {}
+    out = []
+    if playbook == "discovery_mission":
+        if s.get("useful") and s.get("lead_target"):
+            out.append({"tier": "lead",
+                        "title": f"Lead: {s['lead_target']} for {s.get('disease','?')}",
+                        "detail": f"The mission cleared the bar on {s['lead_target']} "
+                                  f"(tried {s.get('targets_tried','?')} target(s))."})
+        elif s.get("targets_tried"):
+            out.append({"tier": "finding",
+                        "title": f"No clean lead yet for {s.get('disease','?')}",
+                        "detail": f"Tried {s['targets_tried']} target(s); none cleared the bar."})
+    elif playbook == "literature_discovery":
+        tg = s.get("targets") or []
+        if s.get("druglike", 0) > 0 or len(tg) >= 3:
+            out.append({"tier": "finding",
+                        "title": f"Targets for {s.get('disease','?')}: {', '.join(tg[:4])}",
+                        "detail": f"{s.get('papers_read','?')} papers read; "
+                                  f"{s.get('druglike',0)} clean drug-like candidate(s)."})
+    elif playbook == "target_intel":
+        cr = s.get("crowding")
+        if cr in ("Open space", "Lightly explored"):
+            out.append({"tier": "finding",
+                        "title": f"{s.get('target','?')}: {cr}",
+                        "detail": f"{s.get('pdb',0)} PDB structure(s), {s.get('drugs',0)} known drug(s) — "
+                                  "room to work."})
+    elif playbook in ("disease_repurposing", "antiviral_repurposing", "antibacterial_repurposing"):
+        if s.get("candidates"):
+            out.append({"tier": "finding",
+                        "title": f"Repurposing hits for {s.get('disease') or s.get('virus') or s.get('bacterium','?')}",
+                        "detail": f"{s.get('candidates')} ranked candidate(s); top target {s.get('top_target','?')}."})
+    elif playbook == "structure_watch":
+        if s.get("changes"):
+            out.append({"tier": "finding",
+                        "title": f"{s['changes']} target(s) changed",
+                        "detail": "New experimental structures or drugs released on the watchlist."})
+    return out
+
+
+# ---------------------------------------------------------------- deficiency → new agent
+def _deficiency(playbook: str, summary: dict, existing_foci: set) -> dict | None:
+    """When a worker comes up short, define a specialist agent to attack the gap.
+    Returns an agent spec, or None. Deduped by (playbook, focus) upstream."""
+    s = summary or {}
+    if playbook == "discovery_mission" and not s.get("useful"):
+        disease = s.get("disease")
+        if disease:
+            # the mission found targets but no clean lead — widen the search with a
+            # deeper literature read + repurposing net on the same disease.
+            if ("disease_repurposing", disease) not in existing_foci:
+                return {"name": f"repurposer-{_slug(disease)}", "focus": disease,
+                        "playbook": "disease_repurposing", "params": {"disease": disease},
+                        "reason": f"discovery mission found no clean lead for {disease}; "
+                                  "widen to all known modulators (repurposing)."}
+            if ("literature_discovery", disease) not in existing_foci:
+                return {"name": f"deep-reader-{_slug(disease)}", "focus": disease,
+                        "playbook": "literature_discovery",
+                        "params": {"disease": disease, "max_papers": 25, "max_targets": 8, "design": True},
+                        "reason": f"deepen the literature read for {disease} (more papers, design analogs)."}
+    if playbook == "literature_discovery" and not (s.get("targets")):
+        disease = s.get("disease")
+        if disease and ("bio_target_dossier", disease) not in existing_foci:
+            return {"name": f"graph-scout-{_slug(disease)}", "focus": disease,
+                    "playbook": "bio_target_dossier", "params": {"disease": disease},
+                    "reason": f"literature yielded no targets for {disease}; fall back to the graph."}
+    return None
+
+
+def _slug(x):
+    return "".join(ch for ch in (x or "").lower() if ch.isalnum() or ch == " ").strip().replace(" ", "-")[:28]
+
+
+# ---------------------------------------------------------------- email
+def _email(esc: dict, cfg: dict, ctx=None):
+    if not cfg.get("email_alerts"):
+        return
+    host = os.environ.get("DDD_SMTP_HOST", "smtp.gmail.com")
+    port = int(os.environ.get("DDD_SMTP_PORT", "587"))
+    user = os.environ.get("DDD_SMTP_USER", "").strip()
+    pw = os.environ.get("DDD_SMTP_PASS", "").strip()
+    to = os.environ.get("DDD_ALERT_TO", user).strip()
+    if not (user and pw and to):
+        if ctx:
+            ctx.log("email: not configured (set DDD_SMTP_USER/PASS/ALERT_TO in .env) — inbox only")
+        return
+    try:
+        m = EmailMessage()
+        m["Subject"] = f"[ddd {esc['tier']}] {esc['title']}"
+        m["From"] = user
+        m["To"] = to
+        m.set_content(f"{esc['title']}\n\n{esc['detail']}\n\n— ddd swarm supervisor\n"
+                      f"(prioritisation over public data, not a validated lead)")
+        with smtplib.SMTP(host, port, timeout=20) as srv:
+            srv.starttls()
+            srv.login(user, pw)
+            srv.send_message(m)
+        if ctx:
+            ctx.log(f"email sent to {to}")
+    except Exception as e:
+        if ctx:
+            ctx.log(f"email failed: {str(e)[:80]}")
+
+
+def _escalate(s, esc, task, report, cfg, ctx):
+    tier = esc["tier"]
+    if tier == "lead" and not cfg.get("escalate_leads"):
+        return
+    if tier == "finding" and not cfg.get("escalate_findings"):
+        return
+    rec = {"id": _nid(s, "e"), "tier": tier, "title": esc["title"], "detail": esc["detail"],
+           "playbook": task["playbook"], "report": report, "created": time.time(), "read": False}
+    s["escalations"].append(rec)
+    s["stats"]["leads" if tier == "lead" else "findings"] += 1
+    if ctx:
+        ctx.log(f"★ escalate [{tier}] {esc['title']}")
+    _email(rec, cfg, ctx)
+
+
+# ---------------------------------------------------------------- queue helpers
+def _active_foci(s):
+    return {(t["playbook"], (t["params"] or {}).get("disease") or (t["params"] or {}).get("target"))
+            for t in s["queue"] if t["status"] in ("pending", "running")}
+
+
+def _enqueue(s, playbook, params, origin, label):
+    s["queue"].append({"id": _nid(s, "t"), "playbook": playbook, "params": params,
+                       "origin": origin, "label": label, "status": "pending",
+                       "run_id": None, "created": time.time(), "finished": None})
+
+
+def _spawn(s, spec, cfg, ctx):
+    if len([a for a in s["dynamic_agents"]]) >= cfg["max_dynamic_agents"]:
+        return False
+    if any(a["playbook"] == spec["playbook"] and a["focus"] == spec["focus"] for a in s["dynamic_agents"]):
+        return False
+    spec = dict(spec, created=time.time())
+    s["dynamic_agents"].append(spec)
+    s["stats"]["agents_spawned"] += 1
+    _enqueue(s, spec["playbook"], spec["params"], spec["name"], f"{spec['name']}: {spec['reason']}")
+    if ctx:
+        ctx.log(f"✦ spawned agent {spec['name']} — {spec['reason']}")
+    return True
+
+
+# ---------------------------------------------------------------- the heartbeat
+def tick(ctx, max_dispatch: int | None = None):
+    cfg = _cfg()
+    s = _load()
+    if not cfg.get("enabled", True):
+        ctx.log("swarm disabled (charter.swarm.enabled=false)")
+        _save(s)
+        return {"enabled": False}, ["# Swarm tick", "", "Swarm is disabled."]
+    batch = int(max_dispatch if max_dispatch is not None else cfg["batch_per_tick"])
+    harvested = dispatched = escalated = spawned = 0
+
+    # 1) HARVEST finished runs
+    for t in s["queue"]:
+        if t["status"] != "running" or not t.get("run_id"):
+            continue
+        row = db.run_get(t["run_id"])
+        if not row or row.get("status") == "running":
+            continue
+        t["status"] = row.get("status", "error")
+        t["finished"] = time.time()
+        harvested += 1
+        if t["status"] == "error":
+            s["stats"]["errors"] += 1
+            ctx.log(f"✗ {t['playbook']} ({t.get('label','')[:40]}) errored")
+            continue
+        try:
+            summary = json.loads(row.get("summary") or "{}")
+        except Exception:
+            summary = {}
+        before = len(s["escalations"])
+        for esc in _score(t["playbook"], summary):
+            _escalate(s, esc, t, row.get("report"), cfg, ctx)
+        escalated += len(s["escalations"]) - before
+        spec = _deficiency(t["playbook"], summary,
+                           {(a["playbook"], a["focus"]) for a in s["dynamic_agents"]})
+        if spec and _spawn(s, spec, cfg, ctx):
+            spawned += 1
+    s["stats"]["harvested"] += harvested
+
+    # 2) SEED baseline work so the swarm never idles
+    foci = _active_foci(s)
+    inflight = len([t for t in s["queue"] if t["status"] in ("pending", "running")])
+    if inflight < cfg["target_inflight"]:
+        for disease in charter_mod.load().get("focus_diseases", []):
+            if inflight >= cfg["target_inflight"]:
+                break
+            if (cfg["baseline_worker"], disease) in foci:
+                continue
+            _enqueue(s, cfg["baseline_worker"], {"disease": disease}, "baseline",
+                     f"scan {disease}")
+            foci.add((cfg["baseline_worker"], disease))
+            inflight += 1
+
+    # 3) DISPATCH a small batch of pending tasks as tracked runs
+    from . import engine
+    for t in s["queue"]:
+        if dispatched >= batch:
+            break
+        if t["status"] != "pending":
+            continue
+        try:
+            rid = engine.start(t["playbook"], t["params"], trigger="swarm")
+            t["status"] = "running"
+            t["run_id"] = rid
+            dispatched += 1
+            s["stats"]["dispatched"] += 1
+            ctx.log(f"▶ dispatch {t['playbook']} — {t.get('label','')[:50]} (run r{rid})")
+        except Exception as e:
+            t["status"] = "error"
+            s["stats"]["errors"] += 1
+            ctx.log(f"✗ could not dispatch {t['playbook']}: {str(e)[:70]}")
+
+    s["stats"]["ticks"] += 1
+    s["stats"]["last_tick"] = time.time()
+    _save(s)
+
+    pend = len([t for t in s["queue"] if t["status"] == "pending"])
+    run = len([t for t in s["queue"] if t["status"] == "running"])
+    lines = ["# Swarm tick", "",
+             f"Harvested **{harvested}**, dispatched **{dispatched}**, escalated **{escalated}**, "
+             f"spawned **{spawned}** new agent(s). In flight: {run} running, {pend} pending, "
+             f"{len(s['dynamic_agents'])} dynamic agent(s).", ""]
+    unread = [e for e in s["escalations"] if not e["read"]]
+    if unread:
+        lines += ["## Unread escalations", ""]
+        for e in unread[-10:][::-1]:
+            lines.append(f"- **[{e['tier']}]** {e['title']} — {e['detail']}")
+    summary = {"harvested": harvested, "dispatched": dispatched, "escalated": escalated,
+               "spawned": spawned, "running": run, "pending": pend,
+               "dynamic_agents": len(s["dynamic_agents"]), "unread": len(unread)}
+    return summary, lines
+
+
+# ---------------------------------------------------------------- read API (UI/MCP)
+def status():
+    s = _load()
+    cfg = _cfg()
+    q = s["queue"]
+    return {
+        "enabled": cfg.get("enabled", True),
+        "config": cfg,
+        "inflight": {"running": len([t for t in q if t["status"] == "running"]),
+                     "pending": len([t for t in q if t["status"] == "pending"]),
+                     "done": len([t for t in q if t["status"] == "done"]),
+                     "error": len([t for t in q if t["status"] == "error"])},
+        "running": [{"playbook": t["playbook"], "label": t.get("label"), "run_id": t.get("run_id")}
+                    for t in q if t["status"] == "running"],
+        "pending": [{"playbook": t["playbook"], "label": t.get("label")}
+                    for t in q if t["status"] == "pending"][:20],
+        "dynamic_agents": s["dynamic_agents"],
+        "stats": s["stats"],
+        "escalations": sorted(s["escalations"], key=lambda e: (e["read"], -e["created"]))[:40],
+        "unread": len([e for e in s["escalations"] if not e["read"]]),
+    }
+
+
+def escalations(unread_only=False, limit=50):
+    s = _load()
+    es = [e for e in s["escalations"] if (not unread_only or not e["read"])]
+    return sorted(es, key=lambda e: -e["created"])[:limit]
+
+
+def mark_read(ids=None):
+    s = _load()
+    n = 0
+    for e in s["escalations"]:
+        if (ids is None or e["id"] in ids) and not e["read"]:
+            e["read"] = True
+            n += 1
+    _save(s)
+    return n
+
+
+def configure(**kw):
+    cur = (charter_mod.load().get("swarm") or {})
+    cur = dict(_DEFAULT_CFG, **cur)
+    for k, v in kw.items():
+        if k in _DEFAULT_CFG and v is not None:
+            cur[k] = v
+    charter_mod.save({"swarm": cur})
+    return cur

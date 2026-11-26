@@ -56,6 +56,10 @@ DEPARTMENTS = [
                "Turn a validated lead into a runnable program: staged experiments, CRO tasks, outreach and "
                "milestones — the Pipeline-in-a-Person orchestration a solo founder needs.",
                ["programs planned"]),
+    Department("swarm", "Swarm Supervisor", "Overseer",
+               "Keep the worker agents busy on the focus diseases, judge their output, escalate what's worthy "
+               "to the founder (inbox + email), and spawn new specialist agents to attack gaps. Always on.",
+               ["escalations", "agents spawned"]),
 ]
 DEPT = {d.id: d for d in DEPARTMENTS}
 
@@ -90,6 +94,10 @@ PLAYBOOKS = {p.name: p for p in [
              {"genes": {"type": "text", "default": "STAT1\nIRF1\nCXCL10\nGBP1\nTAP1\nIDO1\nCXCL9"},
               "disease": {"type": "str", "default": ""}},
              pb.deg_interpret),
+    Playbook("swarm_tick", "Swarm tick", "swarm",
+             "One heartbeat of the supervisor: harvest finished runs, escalate worthy findings (inbox + "
+             "email), spawn specialist agents for gaps, and dispatch new work. Runs continuously on a timer.",
+             {"max_dispatch": {"type": "int", "default": 1}}, pb.swarm_tick),
     Playbook("discovery_mission", "Discovery mission", "bio",
              "Agents in tandem: read the literature → scout each target (readiness) → design novel "
              "drug-like analogs, looping over targets until a candidate clears the bar (QED ≥ 0.5, no "
@@ -347,6 +355,20 @@ def _scheduler_loop():
         time.sleep(30)
 
 
+_SWARM_INTERVAL = int(os.environ.get("DDD_SWARM_INTERVAL", "900"))  # seconds between ticks
+
+
+def _swarm_loop():
+    time.sleep(45)  # let startup settle before the first tick
+    while True:
+        try:
+            if charter_mod.load().get("swarm", {}).get("enabled", True):
+                start("swarm_tick", {}, trigger="swarm timer")
+        except Exception:
+            pass
+        time.sleep(max(60, _SWARM_INTERVAL))
+
+
 def start_scheduler():
     global _sched_started
     if _sched_started:
@@ -355,6 +377,7 @@ def start_scheduler():
     db.mark_orphans()
     db.seed_default_schedules()
     threading.Thread(target=_scheduler_loop, daemon=True).start()
+    threading.Thread(target=_swarm_loop, daemon=True).start()
 
 
 # ---------------------------------------------------------------- overview
@@ -395,4 +418,16 @@ def overview() -> dict:
             "rea": rea_bridge.available(),
         },
         "next_scheduled": [{"playbook": s["playbook"], "every": s["every"], "next_run": s["next_run"]} for s in nxt[:5]],
+        "swarm": _swarm_overview(),
     }
+
+
+def _swarm_overview():
+    try:
+        from . import swarm
+        st = swarm.status()
+        return {"enabled": st["enabled"], "inflight": st["inflight"], "unread": st["unread"],
+                "dynamic_agents": len(st["dynamic_agents"]), "stats": st["stats"],
+                "interval_s": _SWARM_INTERVAL}
+    except Exception as e:
+        return {"error": str(e)[:120]}

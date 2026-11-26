@@ -122,6 +122,53 @@ class _NullCtx:
 
 
 @mcp.tool()
+def swarm_status() -> dict:
+    """The self-running swarm at a glance: whether it's on, how many worker runs are
+    in flight, the dynamic specialist agents it has spawned, the per-run stats, and
+    the escalation inbox (worthy findings, unread first). This is how the supervisor
+    'reports to us' — read it to see what the company turned up on its own."""
+    from .company import swarm
+    return swarm.status()
+
+
+@mcp.tool()
+def swarm_escalations(unread_only: bool = True, mark_read: bool = False, limit: int = 30) -> dict:
+    """The supervisor's inbox of worthy findings (leads and notable results the swarm
+    surfaced on its own). unread_only filters to new ones; mark_read=True marks the
+    returned items read so they don't resurface. Each item links the report it came from."""
+    from .company import swarm
+    items = swarm.escalations(unread_only=unread_only, limit=limit)
+    if mark_read and items:
+        swarm.mark_read([e["id"] for e in items])
+    return {"count": len(items), "escalations": items}
+
+
+@mcp.tool()
+def swarm_tick(max_dispatch: int = 1) -> dict:
+    """Run one supervisor heartbeat now (instead of waiting for the timer): harvest
+    finished runs, escalate worthy findings, spawn specialist agents for gaps, and
+    dispatch new work. Returns what this tick did."""
+    from .company import swarm
+    summary, lines = swarm.tick(_NullCtx(), max_dispatch=max_dispatch)
+    return {"ok": True, "summary": summary, "markdown": "\n".join(lines)}
+
+
+@mcp.tool()
+def swarm_configure(enabled: bool | None = None, batch_per_tick: int | None = None,
+                    target_inflight: int | None = None, max_dynamic_agents: int | None = None,
+                    escalate_leads: bool | None = None, escalate_findings: bool | None = None,
+                    email_alerts: bool | None = None) -> dict:
+    """Tune the swarm (persists to the charter): turn it on/off, set how many runs it
+    dispatches per tick and keeps in flight, cap dynamic agents, and choose what
+    escalates (leads and/or notable findings) and whether to email. Returns the new config."""
+    from .company import swarm
+    return swarm.configure(enabled=enabled, batch_per_tick=batch_per_tick,
+                           target_inflight=target_inflight, max_dynamic_agents=max_dynamic_agents,
+                           escalate_leads=escalate_leads, escalate_findings=escalate_findings,
+                           email_alerts=email_alerts)
+
+
+@mcp.tool()
 def discovery_mission(disease: str, max_targets_try: int = 4, want: int = 1, dock: bool = False) -> dict:
     """Run the whole pipeline with agents in tandem until something useful turns up: read the
     literature → scout each target's readiness → design novel drug-like analogs, looping over
