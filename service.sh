@@ -55,6 +55,15 @@ _boot() {
   launchctl enable "$DOMAIN/$label" 2>/dev/null || true
 }
 
+_wait_up() {
+  echo "Waiting for startup (first start compiles RDKit, ~20s)..."
+  for i in $(seq 1 45); do
+    curl -fs "http://127.0.0.1:$WEB_PORT/healthz" >/dev/null 2>&1 && return 0
+    sleep 1
+  done
+  return 1
+}
+
 cmd_install() {
   for p in "$WEB_PORT" "$MCP_PORT"; do
     pids=$(lsof -ti tcp:"$p" -sTCP:LISTEN 2>/dev/null || true)
@@ -66,7 +75,7 @@ cmd_install() {
   _boot "$MCP_LABEL"
   _boot "$WEB_LABEL"
   echo "Installed. ddd is now supervised by launchd (auto-restarts on crash, starts on login)."
-  sleep 2
+  _wait_up || true
   cmd_status
 }
 
@@ -74,7 +83,7 @@ cmd_restart() {
   launchctl kickstart -k "$DOMAIN/$MCP_LABEL" 2>/dev/null || _boot "$MCP_LABEL"
   launchctl kickstart -k "$DOMAIN/$WEB_LABEL" 2>/dev/null || _boot "$WEB_LABEL"
   echo "Restarted both services."
-  sleep 2
+  _wait_up || true
   cmd_status
 }
 
