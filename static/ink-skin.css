@@ -72,3 +72,9 @@ select:not([multiple]):not([size]){
   background-image:var(--ink-chevron) !important;background-repeat:no-repeat !important;
   background-position:right 12px center !important;background-size:12px 12px !important}
 select::-ms-expand{display:none}
+
+/* Clickable benchmark rows + virtual-cell scales */
+.idx-row{transition:background .1s}
+.idx-row:hover{background:var(--accent-soft)!important}
+.scale{transition:border-color .1s,background .1s}
+.scale:hover{border-color:var(--sel-line)!important;background:var(--hover)!important}

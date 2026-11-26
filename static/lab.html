@@ -297,7 +297,7 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:
 </style>
 <script>(function(){try{var t=localStorage.getItem("ddd-theme")||"light";document.documentElement.setAttribute("data-theme",t);}catch(e){document.documentElement.setAttribute("data-theme","light");}})();</script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/ink-skin.css?v=0.32.0">
+<link rel="stylesheet" href="/static/ink-skin.css?v=0.34.0">
 </head>
 <body>
 <header class="lab">
@@ -792,10 +792,13 @@ async function initCompany(){
   $("roles").innerHTML = c.roles.map(r => `<div class="role"><b>${esc(r.name)}</b><p>${esc(r.does)}</p></div>`).join("");
   const idx = await api("/api/index");
   $("indexCats").innerHTML = Object.entries(idx.categories).map(([k,v]) => `<span class="pill">${esc(k)} · ${v}</span>`).join("");
-  $("indexTable").innerHTML = `<table><tr><th>Benchmark</th><th>Category</th><th>Known caveat</th></tr>` + idx.entries.map(e =>
-    `<tr><td><b>${esc(e.name)}</b>${e.repo?`<br><span class="muted mono" style="font-size:11px">${esc(e.repo)}</span>`:''}<br><span class="muted">${esc(e.measures)}</span></td><td>${esc(e.category)}</td><td><div class="caveat">${esc(e.caveat)}</div></td></tr>`).join("") + `</table>`;
+  $("indexTable").innerHTML = `<table><tr><th>Benchmark</th><th>Category</th><th>Known caveat</th></tr>` + idx.entries.map(e => {
+    const click = e.local_task ? `openTaskPanel('${esc(e.local_task)}')` : (e.url ? `window.open('${esc(e.url)}','_blank')` : '');
+    return `<tr class="idx-row"${click?` style="cursor:pointer" onclick="${click}"`:''}><td><b>${esc(e.name)}</b>${e.local_task?' <span class="tag">open ▸</span>':''}${e.repo?`<br><span class="muted mono" style="font-size:11px">${esc(e.repo)}</span>`:''}<br><span class="muted">${esc(e.measures)}</span></td><td>${esc(e.category)}</td><td><div class="caveat">${esc(e.caveat)}</div></td></tr>`;
+  }).join("") + `</table>`;
   const v = await api("/api/vcell");
-  $("vcellScales").innerHTML = v.scales.map(sc => `<div class="scale"><span class="z">${sc.zoom}</span><div><b>${esc(sc.name)}</b><br><span class="muted" style="font-size:12px">${esc(sc.models)}</span></div><span class="st ${sc.status}">${sc.status}</span></div>`).join("");
+  window.VSCALES = v.scales;
+  $("vcellScales").innerHTML = v.scales.map(sc => `<div class="scale" style="cursor:pointer" onclick="openScale('${esc(sc.id)}')"><span class="z">${sc.zoom}</span><div><b>${esc(sc.name)}</b> <span class="muted" style="font-size:11px">▸</span><br><span class="muted" style="font-size:12px">${esc(sc.models)}</span></div><span class="st ${sc.status}">${sc.status}</span></div>`).join("");
   $("vcellNote").textContent = v.note;
 }
 async function runProgram(){
@@ -1358,6 +1361,26 @@ function drawPAE(mat, mx){
 /* ---- Clickable benchmark: task/leaderboard -> make a model, see progress, feasibility ---- */
 function closeTask(){var b=document.getElementById("taskBack"),m=document.getElementById("taskModal");if(b)b.classList.remove("on");if(m)m.classList.remove("on");}
 function openTaskPanel(id){var t=(TASKS||[]).find(function(x){return x.id===id;});if(!t)return;document.getElementById("taskBack").classList.add("on");document.getElementById("taskModal").classList.add("on");renderTaskModal(t);}
+function viewLiveCell(){ closeTask(); var d=document.getElementById("cellDis"); if(d&&!d.value.trim()) d.value="idiopathic pulmonary fibrosis"; if(typeof loadCell==="function") loadCell(); var s=document.getElementById("cellsec"); if(s) s.scrollIntoView({behavior:"smooth"}); }
+function openScale(id){
+  var sc=(window.VSCALES||[]).find(function(x){return x.id===id;}); if(!sc) return;
+  var m=document.getElementById("taskModal"); document.getElementById("taskBack").classList.add("on"); m.classList.add("on");
+  var action;
+  if(sc.status==="live"){
+    action='<div class="row" style="gap:8px"><button onclick="viewLiveCell()">▸ View live cell</button><button class="ghost" onclick="closeTask();document.getElementById(\'indexsec\').scrollIntoView({behavior:\'smooth\'})">See the bench</button></div>'
+      +'<p class="muted" style="font-size:12.5px;margin-top:10px;line-height:1.5">This scale is the live property-model bench (RDKit descriptors + baselines). Its real-time view is the data-driven Virtual Cell below — it moves as it loads a disease’s proteins into their real subcellular compartments.</p>';
+  } else if(sc.status==="linked"){
+    action = sc.url
+      ? '<button onclick="window.open(\''+esc(sc.url)+'\',\'_blank\')">▸ Open Fate Memory Lab</button>'
+      : '<p class="muted" style="font-size:12.5px;line-height:1.5">Links to your <b>Fate Memory Lab</b> (the cell-biology rule engine: membrane intake, drug/chemical triggers). To open it from here, set <code>DDD_FATE_URL</code> in <code>.env</code> to its address and restart.</p>';
+  } else {
+    action='<p class="muted" style="font-size:12.5px;line-height:1.5">Planned scale — a fixed-contract stub so engines can be added without breaking callers. It will model: '+esc(sc.models)+'.</p>';
+  }
+  m.innerHTML='<button class="x" onclick="closeTask()">×</button>'
+    +'<h3>'+esc(sc.name)+' <span class="muted" style="font-weight:400;font-size:13px">· scale '+sc.zoom+'</span></h3>'
+    +'<p class="tk-meta"><span class="st '+esc(sc.status)+'">'+esc(sc.status)+'</span> &middot; '+esc(sc.models)+'</p>'
+    +'<div class="tk-sec">'+action+'</div>';
+}
 async function renderTaskModal(t, extra){
   var m=document.getElementById("taskModal");
   var board={}, jobs=[];

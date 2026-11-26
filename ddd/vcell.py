@@ -6,6 +6,9 @@ stable while the engines are filled in.
 """
 from __future__ import annotations
 
+import copy
+import os
+
 SCALES = [
     {"id": "molecular", "name": "Molecular", "zoom": 0,
      "models": "RDKit descriptors, baseline property models (this bench)",
@@ -24,13 +27,29 @@ SCALES = [
 ]
 
 
+def _scales():
+    """Scales with runtime detail for the UI: the live Molecular scale opens the
+    real-time cell view; the linked Intracellular scale opens Fate Memory Lab
+    (URL from DDD_FATE_URL in .env, if set)."""
+    fate = os.environ.get("DDD_FATE_URL", "").strip()
+    out = []
+    for s in SCALES:
+        s = copy.deepcopy(s)
+        if s["status"] == "live" and s["id"] == "molecular":
+            s["view"] = "cell"          # the UI opens the real-time Virtual Cell animation
+        if s.get("links_to") == "fate-memory-lab":
+            s["url"] = fate             # empty unless DDD_FATE_URL is configured
+        out.append(s)
+    return out
+
+
 def overview() -> dict:
     return {
         "name": "Virtual Cell",
         "note": ("A multi-scale scaffold. Biological age is the intended conditioning variable. "
                  "The intracellular scale links to your Fate Memory Lab; other scales are stubs "
                  "with a fixed contract so engines can be added without breaking callers."),
-        "scales": SCALES,
+        "scales": _scales(),
         "conditioning": ["biological_age", "perturbation (compound)", "genotype"],
         "live_scales": [s["id"] for s in SCALES if s["status"] == "live"],
     }
