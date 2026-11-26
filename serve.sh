@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -e
 cd "$(dirname "$0")"
+if [ -f "$HOME/Library/LaunchAgents/com.fueldeskpro.ddd-web.plist" ]; then
+  echo "ddd is supervised by launchd (auto-restarts on crash). Restarting via service..."
+  exec ./service.sh restart
+fi
 if [ -f .env ]; then set -a; . ./.env; set +a; fi
 WEB=${DDD_WEB_PORT:-47520}
 MCP=${DDD_MCP_PORT:-47521}
