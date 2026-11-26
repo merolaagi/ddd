@@ -143,6 +143,25 @@ def fml_runs(limit: int = 20) -> dict:
 
 
 @mcp.tool()
+def pathway_context(target: str, knockdown: bool = False) -> dict:
+    """Drug-research ingredient from Fate Memory Lab's pathway library: given a target
+    enzyme (gene symbol, e.g. XO, DHFR, TYMS), return the pathway it sits in, what it
+    converts, the disease its deficiency causes, and the drugs that already modulate it
+    (with mechanism) — real starting points for repurposing or analog design. With
+    knockdown=True, also simulate knocking it down for mechanistic validation."""
+    from .sources import pathways as pw
+    ctx = pw.for_target(target)
+    if not ctx:
+        return {"found": False, "target": target,
+                "note": "not an indexed enzyme in the FML pathway library"}
+    if knockdown:
+        kd = pw.knockdown(target)
+        if kd:
+            ctx["knockdown"] = kd
+    return ctx
+
+
+@mcp.tool()
 def swarm_status() -> dict:
     """The self-running swarm at a glance: whether it's on, how many worker runs are
     in flight, the dynamic specialist agents it has spawned, the per-run stats, and

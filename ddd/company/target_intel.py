@@ -92,6 +92,18 @@ def _gather(target: str, ctx=None, organism: str | None = None) -> dict:
                 f"{out['known_drugs']['max_phase']}")
     except Exception as e:
         log(f"Open Targets: unavailable ({str(e)[:70]})")
+    # Fate Memory Lab pathway ingredient: if the target is a known enzyme, pull its
+    # pathway, the disease its deficiency causes, and the drugs that already hit it.
+    try:
+        from ..sources import pathways as pw
+        ctx_pw = pw.for_target(gene)
+        if ctx_pw:
+            out["pathway"] = ctx_pw
+            n = sum(len(c["drugs"]) for c in ctx_pw["contexts"])
+            log(f"FML pathway: {gene} in {ctx_pw['contexts'][0]['pathway']}"
+                + (f", {n} known modulator(s)" if n else ""))
+    except Exception as e:
+        log(f"FML pathway: unavailable ({str(e)[:60]})")
     return out
 
 
@@ -187,17 +199,45 @@ def dossier(ctx, target: str):
         lines.append(f"| Known drugs (Open Targets) | {kd['count']} · max phase {kd['max_phase']}{ex} |")
     else:
         lines.append("| Known drugs (Open Targets) | none found / unavailable |")
+    pw = g.get("pathway")
+    lines.append(f"| Pathway & modulators (FML) | {_pw_evidence(pw)} |")
     if pdb and pdb.get("entries"):
         lines += ["", "## Recent experimental structures", "", "| PDB | Method | Res (Å) | Ligands | Released |", "|---|---|---|---|---|"]
         for e in pdb["entries"][:6]:
             lines.append(f"| {e['id']} | {e.get('method') or '—'} | {e.get('resolution') or '—'} | "
                          f"{e.get('ligands') or 0} | {e.get('released') or '—'} |")
-    lines += ["", "_Signals are from public AlphaFold DB, RCSB PDB, ChEMBL and Open Targets. "
-              "The verdict is a prioritisation heuristic, not a guarantee of novelty or success._"]
+    if pw and pw.get("contexts"):
+        lines += ["", "## Pathway context — Fate Memory Lab", ""]
+        for c in pw["contexts"][:3]:
+            lines.append(f"**{c['enzyme']}** in *{c['pathway']}* — {c['reaction']}"
+                         + (f" ({c['converts']})" if c.get('converts') else "")
+                         + (f". Deficiency: {c['deficiency']}." if c.get('deficiency') else "."))
+            if c.get("drugs"):
+                lines += ["", "| Drug | Effect | Mechanism |", "|---|---|---|"]
+                for d in c["drugs"]:
+                    lines.append(f"| {d.get('name','?')} | {d.get('effect','?')} | {d.get('note','')} |")
+            lines.append("")
+        lines.append("_These are an **ingredient**: known enzyme modulators and the pathway mechanism, "
+                     "pulled from the Fate Memory Lab rule engine — real starting points for repurposing or analog design._")
+    lines += ["", "_Signals are from public AlphaFold DB, RCSB PDB, ChEMBL, Open Targets and the "
+              "Fate Memory Lab pathway library. The verdict is a prioritisation heuristic, not a guarantee._"]
     summary = {"target": name, "uniprot": g.get("uniprot"), "crowding": v["crowding"],
                "pdb": (pdb or {}).get("count", 0), "drugs": (kd or {}).get("count", 0),
-               "structure_known": bool(af or (pdb or {}).get("count"))}
+               "structure_known": bool(af or (pdb or {}).get("count")),
+               "pathway_drugs": sum(len(c["drugs"]) for c in (pw or {}).get("contexts", [])) if pw else 0}
     return summary, lines
+
+
+def _pw_evidence(pw):
+    if not pw or not pw.get("contexts"):
+        return "not an indexed pathway enzyme"
+    c0 = pw["contexts"][0]
+    n = sum(len(c["drugs"]) for c in pw["contexts"])
+    base = f"{c0['enzyme']} in {c0['pathway']}"
+    if n:
+        names = [d["name"] for c in pw["contexts"] for d in c["drugs"]][:4]
+        return base + f" · {n} known modulator(s): " + ", ".join(names)
+    return base + " · no known modulator in library"
 
 
 # ---------------------------------------------------------------- identify sequence
