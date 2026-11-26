@@ -91,11 +91,18 @@ def _score(playbook: str, summary: dict) -> list:
     s = summary or {}
     out = []
     if playbook == "discovery_mission":
+        pv = s.get("pathway_validated") or []
+        pv_note = (f" Pathway rule engine validated {', '.join(pv)} (known modulators on record)." if pv else "")
         if s.get("useful") and s.get("lead_target"):
             out.append({"tier": "lead",
                         "title": f"Lead: {s['lead_target']} for {s.get('disease','?')}",
                         "detail": f"The mission cleared the bar on {s['lead_target']} "
-                                  f"(tried {s.get('targets_tried','?')} target(s))."})
+                                  f"(tried {s.get('targets_tried','?')} target(s))." + pv_note})
+        elif pv:
+            out.append({"tier": "finding",
+                        "title": f"Known-modulator anchor for {s.get('disease','?')}: {', '.join(pv[:4])}",
+                        "detail": f"No clean de-novo lead yet, but the pathway rule engine flags "
+                                  f"{len(pv)} enzyme(s) with approved modulators — a repurposing anchor."})
         elif s.get("targets_tried"):
             out.append({"tier": "finding",
                         "title": f"No clean lead yet for {s.get('disease','?')}",
@@ -116,9 +123,12 @@ def _score(playbook: str, summary: dict) -> list:
                                   "room to work."})
     elif playbook in ("disease_repurposing", "antiviral_repurposing", "antibacterial_repurposing"):
         if s.get("candidates"):
+            pe = s.get("pathway_enzymes") or []
+            pe_note = (f" Pathway rule engine anchors: {', '.join(pe[:4])}." if pe else "")
             out.append({"tier": "finding",
                         "title": f"Repurposing hits for {s.get('disease') or s.get('virus') or s.get('bacterium','?')}",
-                        "detail": f"{s.get('candidates')} ranked candidate(s); top target {s.get('top_target','?')}."})
+                        "detail": f"{s.get('candidates')} ranked candidate(s); top target {s.get('top_target','?')}."
+                                  + pe_note})
     elif playbook == "structure_watch":
         if s.get("changes"):
             out.append({"tier": "finding",
@@ -134,7 +144,16 @@ def _deficiency(playbook: str, summary: dict, existing_foci: set) -> dict | None
     s = summary or {}
     if playbook == "discovery_mission" and not s.get("useful"):
         disease = s.get("disease")
+        pv = s.get("pathway_validated") or []
         if disease:
+            # Strongest signal: the pathway rule engine already flags enzymes with
+            # approved modulators for this disease — spawn a pathway-repurposer to
+            # mine those known mechanisms first.
+            if pv and ("disease_repurposing", disease) not in existing_foci:
+                return {"name": f"pathway-repurposer-{_slug(disease)}", "focus": disease,
+                        "playbook": "disease_repurposing", "params": {"disease": disease},
+                        "reason": f"pathway rule engine flags known modulators for {disease} "
+                                  f"({', '.join(pv[:3])}); mine those mechanisms for repurposing."}
             # the mission found targets but no clean lead — widen the search with a
             # deeper literature read + repurposing net on the same disease.
             if ("disease_repurposing", disease) not in existing_foci:

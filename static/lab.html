@@ -297,11 +297,11 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:
 </style>
 <script>(function(){try{var t=localStorage.getItem("ddd-theme")||"light";document.documentElement.setAttribute("data-theme",t);}catch(e){document.documentElement.setAttribute("data-theme","light");}})();</script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/ink-skin.css?v=0.35.0">
+<link rel="stylesheet" href="/static/ink-skin.css?v=0.38.0">
 </head>
 <body>
 <header class="lab">
-  <p style="margin:0 0 6px;font-size:14px"><a href="/" style="color:var(--accent);text-decoration:none">← HQ</a> &nbsp;·&nbsp; <a href="/chat" style="color:var(--accent);text-decoration:none">Ask ddd (full chat)</a> &nbsp;·&nbsp; <a href="/fml/" target="_blank" style="color:var(--accent);text-decoration:none">Cell Lab (Fate Memory Lab)</a></p>
+  <p style="margin:0 0 6px;font-size:14px"><a href="/" style="color:var(--accent);text-decoration:none">← HQ</a> &nbsp;·&nbsp; <a href="/chat" style="color:var(--accent);text-decoration:none">Ask ddd (full chat)</a></p>
   <h1><span>ddd</span> Lab</h1>
   <p class="sub">Hands-on tools behind the departments: benchmarks, molecule tools, the Tools Armory and the knowledge graph.</p>
   <div class="pills" id="pills"></div>
@@ -463,7 +463,7 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:
   </section>
   <section class="w6" id="vcellsec">
     <h2>Virtual Cell</h2>
-    <p class="muted" style="font-size:13px;margin:-4px 0 10px">Six biological scales; the intracellular scale links to Fate Memory Lab. A stable scaffold while engines are filled in.</p>
+    <p class="muted" style="font-size:13px;margin:-4px 0 10px">Six biological scales; the intracellular scale is the woven-in pathway rule engine (druggable enzymes + their modulators). A stable scaffold while engines are filled in.</p>
     <div id="vcellScales" class="scales"></div>
     <p class="muted" id="vcellNote" style="font-size:12px;margin-top:10px"></p>
   </section>
@@ -1439,13 +1439,11 @@ function openScale(id){
   var sc=(window.VSCALES||[]).find(function(x){return x.id===id;}); if(!sc) return;
   var m=document.getElementById("taskModal"); document.getElementById("taskBack").classList.add("on"); m.classList.add("on");
   var action;
-  if(sc.status==="live"){
+  if(sc.view==="pathways"){
+    action='<div id="pwIng"><p class="muted" style="font-size:12.5px;line-height:1.5">Loading the pathway ingredient catalogue…</p></div>';
+  } else if(sc.status==="live"){
     action='<div class="row" style="gap:8px"><button onclick="viewLiveCell()">▸ View live cell</button><button class="ghost" onclick="closeTask();document.getElementById(\'indexsec\').scrollIntoView({behavior:\'smooth\'})">See the bench</button></div>'
       +'<p class="muted" style="font-size:12.5px;margin-top:10px;line-height:1.5">This scale is the live property-model bench (RDKit descriptors + baselines). Its real-time view is the data-driven Virtual Cell below — it moves as it loads a disease’s proteins into their real subcellular compartments.</p>';
-  } else if(sc.status==="linked"){
-    action = sc.url
-      ? '<button onclick="window.open(\''+esc(sc.url)+'\',\'_blank\')">▸ Open Fate Memory Lab</button>'
-      : '<p class="muted" style="font-size:12.5px;line-height:1.5">Links to your <b>Fate Memory Lab</b> (the cell-biology rule engine: membrane intake, drug/chemical triggers). To open it from here, set <code>DDD_FATE_URL</code> in <code>.env</code> to its address and restart.</p>';
   } else {
     action='<p class="muted" style="font-size:12.5px;line-height:1.5">Planned scale — a fixed-contract stub so engines can be added without breaking callers. It will model: '+esc(sc.models)+'.</p>';
   }
@@ -1453,6 +1451,34 @@ function openScale(id){
     +'<h3>'+esc(sc.name)+' <span class="muted" style="font-weight:400;font-size:13px">· scale '+sc.zoom+'</span></h3>'
     +'<p class="tk-meta"><span class="st '+esc(sc.status)+'">'+esc(sc.status)+'</span> &middot; '+esc(sc.models)+'</p>'
     +'<div class="tk-sec">'+action+'</div>';
+  if(sc.view==="pathways") loadPathwayIngredients();
+}
+async function loadPathwayIngredients(){
+  var box=document.getElementById("pwIng"); if(!box) return;
+  var d; try{ d=await api("/api/pathways/druggable"); }catch(e){ box.innerHTML='<p class="muted" style="font-size:12.5px">Pathway library unavailable.</p>'; return; }
+  var rows=(d&&d.enzymes)||[];
+  if(!rows.length){ box.innerHTML='<p class="muted" style="font-size:12.5px">No druggable enzymes in the library yet.</p>'; return; }
+  var html='<p class="muted" style="font-size:12.5px;margin:0 0 8px;line-height:1.5">'+rows.length+' druggable enzymes from the pathway rule engine — the ingredients ddd\'s agents draw on. Click an enzyme to run target intelligence on it.</p>'
+    +'<table><tr><th>Enzyme</th><th>Pathway</th><th>Known modulators</th></tr>'
+    +rows.map(function(r){
+      var drugs=(r.drugs||[]).map(function(x){return esc(x.name);}).filter(Boolean).join(", ")||"—";
+      return '<tr><td><a href="#" onclick="closeTask();runScaleTarget(\''+esc(r.enzyme)+'\');return false" style="font-weight:600">'+esc(r.enzyme)+'</a>'
+        +'<div class="muted" style="font-size:11px">'+esc(r.name||"")+'</div></td>'
+        +'<td class="muted" style="font-size:12px">'+esc(r.pathway||"")+'</td>'
+        +'<td style="font-size:12px">'+drugs+'</td></tr>';
+    }).join("")+'</table>'
+    +'<p class="muted" style="font-size:11.5px;margin-top:8px">Source: '+esc(d.source||"pathway library")+'</p>';
+  box.innerHTML=html;
+}
+function runScaleTarget(sym){
+  var mode=document.getElementById("intelMode"), inp=document.getElementById("intelIn");
+  if(mode&&inp){
+    mode.value="readiness"; if(typeof intelMode==="function") intelMode();
+    inp.value=sym;
+    var card=document.getElementById("intelOut")||inp;
+    card.scrollIntoView({behavior:"smooth",block:"center"});
+    if(typeof runIntel==="function") runIntel();
+  }
 }
 async function renderTaskModal(t, extra){
   var m=document.getElementById("taskModal");

@@ -27,6 +27,7 @@ def run(ctx, disease: str, max_targets_try: int = 4, want: int = 1,
     from . import litdiscovery as ld
     from . import target_intel as ti
     from .. import generate as gen
+    from ..sources import pathways as pw
 
     disease = ld._clean_disease(disease)
     if not disease:
@@ -44,6 +45,8 @@ def run(ctx, disease: str, max_targets_try: int = 4, want: int = 1,
     found, trail = [], []
     for gene in targets[:max_targets_try]:
         verdict = None
+        kd_label = None
+        pw_drugs = []
         # --- Agent 2: Scout (target intelligence) ------------------------
         ctx.log(f"▶ Agent 2 · Scout — target intelligence on {gene}")
         try:
@@ -53,6 +56,22 @@ def run(ctx, disease: str, max_targets_try: int = 4, want: int = 1,
                     + (f", {isum.get('pdb')} PDB, {isum.get('drugs')} known drug(s)" if isum else ""))
         except Exception as e:
             ctx.log(f"✗ Scout — {gene}: {str(e)[:70]}")
+
+        # --- Agent 2b: Validator (pathway rule-engine knock-down) --------
+        try:
+            tc = pw.for_target(gene)
+            if tc and tc.get("found"):
+                pw_drugs = sorted({d.get("name") for c in tc["contexts"]
+                                   for d in c.get("drugs", []) if d.get("name")})
+                kd = pw.knockdown(gene)
+                if kd and kd.get("label"):
+                    kd_label = kd["label"]
+                    ctx.log(f"✓ Validator — {gene}: knock-down → {kd_label}"
+                            + (f"; known modulators: {', '.join(pw_drugs)}" if pw_drugs else ""))
+                elif pw_drugs:
+                    ctx.log(f"✓ Validator — {gene}: known modulators {', '.join(pw_drugs)}")
+        except Exception as e:
+            ctx.log(f"– Validator — {gene}: {str(e)[:60]}")
 
         # --- Agent 3: Designer (generative design) -----------------------
         ctx.log(f"▶ Agent 3 · Designer — evolving analogs for {gene}")
@@ -69,9 +88,11 @@ def run(ctx, disease: str, max_targets_try: int = 4, want: int = 1,
             ctx.log(f"✗ Designer — {gene}: {str(e)[:70]}")
             cands = []
 
-        trail.append({"target": gene, "verdict": verdict, "clean": len(clean), "total": len(cands)})
+        trail.append({"target": gene, "verdict": verdict, "clean": len(clean), "total": len(cands),
+                      "knockdown": kd_label, "pathway_drugs": pw_drugs})
         if clean:
-            found.append({"target": gene, "verdict": verdict, "candidates": clean[:5]})
+            found.append({"target": gene, "verdict": verdict, "candidates": clean[:5],
+                          "knockdown": kd_label, "pathway_drugs": pw_drugs})
             ctx.log(f"★ Useful hit on {gene}: {len(clean)} candidate(s) clear the bar")
             if len(found) >= want:
                 break
@@ -91,15 +112,22 @@ def run(ctx, disease: str, max_targets_try: int = 4, want: int = 1,
 
     for hit in found:
         lines += ["", f"## Lead target: {hit['target']}",
-                  f"- **Readiness:** {hit.get('verdict') or 'unknown'}", "",
-                  "| # | SMILES | Score | QED | SA | Sim→seed |", "|---|---|---|---|---|---|"]
+                  f"- **Readiness:** {hit.get('verdict') or 'unknown'}"]
+        if hit.get("knockdown"):
+            lines.append(f"- **Mechanistic validation (pathway knock-down):** {hit['knockdown']}")
+        if hit.get("pathway_drugs"):
+            lines.append(f"- **Known modulators (repurposing anchor):** {', '.join(hit['pathway_drugs'])}")
+        lines += ["", "| # | SMILES | Score | QED | SA | Sim→seed |", "|---|---|---|---|---|---|"]
         for c in hit["candidates"]:
             lines.append(f"| {c['rank']} | `{c['smiles']}` | {c['score']} | {c['qed']} | "
                          f"{c['sa']} | {c['sim_to_seed']} |")
 
-    lines += ["", "## Mission trail", "", "| Target | Readiness | Clean / designed |", "|---|---|---|"]
+    lines += ["", "## Mission trail", "",
+              "| Target | Readiness | Knock-down | Known drugs | Clean / designed |", "|---|---|---|---|---|"]
     for t in trail:
-        lines.append(f"| {t['target']} | {t.get('verdict') or '—'} | {t['clean']} / {t['total']} |")
+        kd = t.get("knockdown") or "—"
+        pdr = ", ".join(t.get("pathway_drugs", [])) or "—"
+        lines.append(f"| {t['target']} | {t.get('verdict') or '—'} | {kd} | {pdr} | {t['clean']} / {t['total']} |")
 
     if found:
         lead = found[0]
@@ -110,7 +138,8 @@ def run(ctx, disease: str, max_targets_try: int = 4, want: int = 1,
     lines += ["", "_Prioritisation from public literature, assays and reward-guided design — "
               "a place to look, not a validated lead._"]
 
+    pw_validated = sorted({t["target"] for t in trail if t.get("knockdown") or t.get("pathway_drugs")})
     summary = {"disease": disease, "targets_tried": len(trail), "leads": len(found),
                "lead_target": (found[0]["target"] if found else None),
-               "useful": bool(found)}
+               "useful": bool(found), "pathway_validated": pw_validated}
     return summary, lines

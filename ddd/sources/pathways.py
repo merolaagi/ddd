@@ -62,6 +62,25 @@ def for_target(symbol: str) -> dict | None:
             "source": "Fate Memory Lab pathway library"}
 
 
+def druggable() -> dict:
+    """All enzymes in the library that have a known modulator — the ingredient
+    catalogue the Intracellular scale shows, each enzyme clickable to run intel."""
+    rows, seen = [], set()
+    for enz, hits in sorted(_index().items()):
+        drugs = [d for p, r in hits for d in r.get("drugs", [])]
+        if not drugs:
+            continue
+        p0, r0 = hits[0]
+        key = enz
+        if key in seen:
+            continue
+        seen.add(key)
+        rows.append({"enzyme": enz, "name": r0["name"], "pathway": p0["name"],
+                     "deficiency": r0.get("deficiency"),
+                     "drugs": [{"name": d.get("name"), "effect": d.get("effect")} for d in drugs]})
+    return {"count": len(rows), "enzymes": rows, "source": "Fate Memory Lab pathway library"}
+
+
 def for_disease(disease: str) -> dict | None:
     """FML pathways whose deficiency matches a disease → their druggable enzymes."""
     d = (disease or "").strip().lower()
@@ -83,7 +102,8 @@ def for_disease(disease: str) -> dict | None:
 
 def knockdown(symbol: str) -> dict | None:
     """Mechanistic validation ingredient: simulate knocking the enzyme down in its
-    pathway and report the main downstream change (FML what_if)."""
+    pathway and report the main downstream change (FML what_if). Returns a short
+    human label like 'xanthine ↑ 3.2× (full knock-out)' plus the top changes."""
     symbol = (symbol or "").strip().upper()
     hits = _index().get(symbol)
     if not hits:
@@ -91,8 +111,20 @@ def knockdown(symbol: str) -> dict | None:
     p, r = hits[0]
     try:
         from ..fml.pathways import what_if
-        res = what_if(p, r["id"])
-        return {"enzyme": symbol, "pathway": p["name"], "label": res.get("label"),
-                "changes": (res.get("changes") or [])[:5], "settled": res.get("settled")}
+        res = what_if(p, "r:" + r["id"])
+        cases = (res or {}).get("cases") or []
+        if not cases:
+            return None
+        ko = cases[-1]  # the most severe level (…, 0.0 = full knock-out)
+        changes = ko.get("changes") or []
+        label = None
+        if changes:
+            c = changes[0]
+            arrow = "↑" if c.get("fold", 1) >= 1 else "↓"
+            label = f"{c['species']} {arrow} {c.get('fold')}× ({ko.get('label','knock-out')})"
+        else:
+            label = f"no steady-state shift ({ko.get('label','knock-out')})"
+        return {"enzyme": symbol, "pathway": p["name"], "label": label,
+                "changes": changes[:5], "settled": ko.get("settled")}
     except Exception:
         return None

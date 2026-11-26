@@ -123,10 +123,9 @@ class _NullCtx:
 
 @mcp.tool()
 def fml_pathways() -> dict:
-    """Fate Memory Lab (merged into ddd as the Intracellular / rule-engine scale):
-    the metabolic pathways its rule engine reasons over — each with the theorems
-    that apply and knock-down behaviour. Returns id, name, species and a short
-    description. Open the full view at /fml/#pathways."""
+    """The pathway rule engine woven into ddd (the Intracellular scale): the
+    metabolic pathways it reasons over, each with its reactions and knock-down
+    behaviour. Returns id, name, species and a short description."""
     from .fml.pathways import PATHWAYS
     return {"count": len(PATHWAYS),
             "pathways": [{"id": p["id"], "name": p["name"], "species": p.get("species"),
@@ -134,12 +133,13 @@ def fml_pathways() -> dict:
 
 
 @mcp.tool()
-def fml_runs(limit: int = 20) -> dict:
-    """Recent Fate Memory Lab circuit-training runs (the rule engine): does a
-    sign-consistent circuit hold memory better? Returns each run's id, name,
-    status, tasks and arms. Full UI at /fml."""
-    from .fml.server import runs_summary
-    return {"runs": runs_summary(limit)}
+def pathways_druggable() -> dict:
+    """The drug-research ingredient catalogue: every enzyme in the pathway library
+    that has a known modulator, with its pathway, the disease its deficiency causes,
+    and the drugs that already hit it. These are the starting points ddd's agents
+    draw on for repurposing and analog design."""
+    from .sources import pathways as pw
+    return pw.druggable()
 
 
 @mcp.tool()

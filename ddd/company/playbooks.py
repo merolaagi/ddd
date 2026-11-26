@@ -838,6 +838,24 @@ def disease_repurposing(ctx, disease: str, top: int = 10, max_compounds: int = 2
     targets = [{"gene": g["gene"], "weight": (g.get("ot_score") or 0.5),
                 "ot_score": g.get("ot_score"), "novel": g.get("novel", False)} for g in ranked_t]
 
+    # Fate Memory Lab ingredient: enzymes in this disease's pathways that already
+    # have approved modulators (the strongest repurposing starting points), plus a
+    # per-target "known drug" annotation when a ranked target is a library enzyme.
+    from ..sources import pathways as pw
+    pw_disease = None
+    try:
+        pw_disease = pw.for_disease(disease)
+    except Exception as e:
+        ctx.log(f"  pathway-library lookup skipped: {str(e)[:80]}")
+    for t in targets:
+        try:
+            tc = pw.for_target(t["gene"])
+            if tc and tc.get("druggable"):
+                drugs = [d.get("name") for c in tc["contexts"] for d in c.get("drugs", []) if d.get("name")]
+                t["pathway_drugs"] = sorted(set(drugs))
+        except Exception:
+            pass
+
     ranked, desc, tox, sol, agg = _compounds_for_targets(ctx, targets, max_compounds)
 
     lines = [f"# Repurposing dossier: {name}", "",
@@ -849,10 +867,26 @@ def disease_repurposing(ctx, disease: str, top: int = 10, max_compounds: int = 2
               "Ranked by Open Targets association (0–1). Rows marked **novel** came from link prediction — "
               "the graph implies them but hasn't been told. Weight (used to score compounds) is the OT score, "
               "or 0.5 for novel targets.", "",
-              "| # | Target | OT score | Novel | ChEMBL modulators |", "|---|---|---|---|---|"]
+              "| # | Target | OT score | Novel | ChEMBL modulators | Known drug (pathway) |",
+              "|---|---|---|---|---|---|"]
     for i, t in enumerate(targets, 1):
         ot = f"{t['ot_score']:.3f}" if t["ot_score"] is not None else "—"
-        lines.append(f"| {i} | {t['gene']} | {ot} | {'yes' if t['novel'] else ''} | {t.get('actives', 0)} |")
+        pd = ", ".join(t.get("pathway_drugs", [])) or "—"
+        lines.append(f"| {i} | {t['gene']} | {ot} | {'yes' if t['novel'] else ''} | {t.get('actives', 0)} | {pd} |")
+
+    if pw_disease and pw_disease.get("hits"):
+        lines += ["", "## Pathway rule engine — known modulators to repurpose", "",
+                  "Enzymes whose deficiency is linked to this disease and the drugs that already hit them "
+                  "(from the woven-in pathway library). These are validated mechanisms — the first places to "
+                  "look for repurposing or fast-follower analogs.", "",
+                  "| Enzyme | Pathway | Deficiency | Known drugs |", "|---|---|---|---|"]
+        seen_enz = set()
+        for h in pw_disease["hits"]:
+            if h["enzyme"] in seen_enz:
+                continue
+            seen_enz.add(h["enzyme"])
+            drugs = ", ".join(d.get("name") for d in h.get("drugs", []) if d.get("name")) or "—"
+            lines.append(f"| {h['enzyme']} | {h['pathway']} | {h.get('deficiency') or '—'} | {drugs} |")
 
     lines += ["", "## Candidate compounds (repurposing)", "",
               "Measured modulators (pChEMBL ≥ 6) of the targets, scored by **potency × association**, bonus for "
@@ -870,9 +904,11 @@ def disease_repurposing(ctx, disease: str, top: int = 10, max_compounds: int = 2
     lines += ["", "_Association and activity are not efficacy. Candidates need disease-relevant assays and "
               "safety/PK before they mean anything clinically. Not clinical advice._"]
 
+    pw_enzymes = sorted({h["enzyme"] for h in (pw_disease.get("hits") if pw_disease else [])})
     return {"disease": name, "targets": len(targets), "novel_targets": novel_added,
             "candidates": len(ranked), "top_target": targets[0]["gene"] if targets else None,
-            "top_compound": ranked[0].get("chembl_id") if ranked else None}, lines
+            "top_compound": ranked[0].get("chembl_id") if ranked else None,
+            "pathway_enzymes": pw_enzymes}, lines
 
 
 # ---------------------------------------------------------------- Omics interpretation

@@ -1,21 +1,21 @@
-"""Virtual Cell: a Chorus-style multi-scale view. v0.3 is a schema + static
-scaffold that links out to Fate Memory Lab (the cell-biology rule engine) for
-the intracellular scale. It does not simulate biology yet; it defines the six
-scales and where each one's model will plug in, so the UI and MCP contract are
-stable while the engines are filled in.
+"""Virtual Cell: a Chorus-style multi-scale view. A schema + scaffold whose
+intracellular scale is the pathway rule engine woven in from Fate Memory Lab
+(druggable enzymes and the drugs that modulate them), shown inline. It does not
+simulate the other scales yet; it defines the six scales and where each one's
+model will plug in, so the UI and MCP contract are stable while the engines are
+filled in.
 """
 from __future__ import annotations
 
 import copy
-import os
 
 SCALES = [
     {"id": "molecular", "name": "Molecular", "zoom": 0,
      "models": "RDKit descriptors, baseline property models (this bench)",
      "status": "live"},
     {"id": "intracellular", "name": "Intracellular", "zoom": 1,
-     "models": "Fate Memory Lab rule engine (membrane intake, drug/chemical triggers)",
-     "status": "linked", "links_to": "fate-memory-lab"},
+     "models": "Pathway rule engine — enzyme reactions and the drugs that modulate them",
+     "status": "live", "view": "pathways"},
     {"id": "intercellular", "name": "Intercellular", "zoom": 2,
      "models": "cell-cell signalling (planned)", "status": "planned"},
     {"id": "tissue", "name": "Tissue", "zoom": 3,
@@ -29,18 +29,13 @@ SCALES = [
 
 def _scales():
     """Scales with runtime detail for the UI: the live Molecular scale opens the
-    real-time cell view; the linked Intracellular scale opens Fate Memory Lab
-    (URL from DDD_FATE_URL in .env, if set)."""
-    # Fate Memory Lab is now merged into ddd and served at /fml; the rule-engine
-    # (Pathways) view is the Intracellular scale. DDD_FATE_URL still overrides.
-    fate = os.environ.get("DDD_FATE_URL", "").strip() or "/fml/#pathways"
+    real-time cell view; the live Intracellular scale shows the woven-in pathway
+    rule engine inline (druggable enzymes and the drugs that modulate them)."""
     out = []
     for s in SCALES:
         s = copy.deepcopy(s)
         if s["status"] == "live" and s["id"] == "molecular":
             s["view"] = "cell"          # the UI opens the real-time Virtual Cell animation
-        if s.get("links_to") == "fate-memory-lab":
-            s["url"] = fate             # empty unless DDD_FATE_URL is configured
         out.append(s)
     return out
 
@@ -49,8 +44,9 @@ def overview() -> dict:
     return {
         "name": "Virtual Cell",
         "note": ("A multi-scale scaffold. Biological age is the intended conditioning variable. "
-                 "The intracellular scale links to your Fate Memory Lab; other scales are stubs "
-                 "with a fixed contract so engines can be added without breaking callers."),
+                 "The intracellular scale is the woven-in pathway rule engine (druggable enzymes "
+                 "and their modulators); other scales are stubs with a fixed contract so engines "
+                 "can be added without breaking callers."),
         "scales": _scales(),
         "conditioning": ["biological_age", "perturbation (compound)", "genotype"],
         "live_scales": [s["id"] for s in SCALES if s["status"] == "live"],
