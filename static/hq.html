@@ -131,6 +131,8 @@ button.link:hover{background:none;text-decoration:underline}
 .viewer .md h3,.viewer .md h4,.viewer .md h5{margin:16px 0 7px;font-weight:500}
 .viewer .md hr{border:0;border-top:1px solid var(--line)}
 .viewer .md blockquote{margin:7px 0;padding:5px 13px;border-left:3px solid var(--accent);color:var(--muted)}
+.entlink{color:var(--accent);cursor:pointer;border-bottom:1px dotted var(--accent);white-space:nowrap}
+.entlink:hover{background:var(--accent-soft);border-radius:3px}
 pre.log{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:11px;font-size:12px;max-height:220px;overflow:auto;white-space:pre-wrap}
 .muted{color:var(--muted)}
 table.t{width:100%;border-collapse:collapse;font-size:14px}
@@ -342,6 +344,8 @@ let OV = null, SEL = null, BOOKS = [];
    tag is added, so content captured from other sites can't inject HTML. */
 function mdInline(t){
   let h = esc(t);
+  h = h.replace(/\[([^\]]+)\]\(ddd:(gene|disease|pathway|target|mol)\)/g,
+    '<a class="entlink" data-kind="$2" onclick="dddEntity(\'$2\', this.textContent)">$1</a>');
   h = h.replace(/`([^`]+)`/g, "<code>$1</code>");
   h = h.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
   h = h.replace(/(^|[\s(])_([^_]+)_(?=[\s).,]|$)/g, "$1<em>$2</em>");
@@ -659,6 +663,6 @@ function tourGo(i){
     </div>
   </div>
 </div>
-<script src="/static/helper.js?v=0.42.0"></script>
+<script src="/static/helper.js?v=0.43.0"></script>
 </body>
 </html>

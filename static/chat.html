@@ -87,6 +87,8 @@ header nav a:hover{color:var(--ink)}
 .md hr{border:0;border-top:1px solid var(--line);margin:12px 0}
 .muted{color:var(--muted)} .err{color:var(--bad)}
 .runout{margin-top:6px}
+.entlink{color:var(--accent);cursor:pointer;border-bottom:1px dotted var(--accent);white-space:nowrap}
+.entlink:hover{background:var(--accent-soft);border-radius:3px}
 .dots::after{content:"";animation:dots 1.4s steps(4,end) infinite}
 @keyframes dots{0%{content:""}25%{content:"·"}50%{content:"··"}75%{content:"···"}}
 
@@ -156,7 +158,8 @@ function ptb(){var b=document.getElementById('tb');if(b)b.textContent=document.d
 
 const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const api=async(p,o)=>{const r=await fetch(p,o);const ct=r.headers.get("content-type")||"";const b=ct.includes("json")?await r.json():await r.text();if(!r.ok)throw new Error((b&&b.detail)||r.status);return b;};
-function mdInline(t){let h=esc(t);h=h.replace(/`([^`]+)`/g,"<code>$1</code>");h=h.replace(/\*\*([^*]+)\*\*/g,"<b>$1</b>");return h;}
+function dddEntity(kind,name){name=(name||"").trim();var m={gene:"Is "+name+" worth pursuing?",target:"Is "+name+" worth pursuing?",disease:"Targets for "+name,pathway:"Literature on "+name,mol:"Describe "+name};go(m[kind]||name);}
+function mdInline(t){let h=esc(t);h=h.replace(/\[([^\]]+)\]\(ddd:(gene|disease|pathway|target|mol)\)/g,'<a class="entlink" data-kind="$2" onclick="dddEntity(\'$2\',this.textContent)">$1</a>');h=h.replace(/`([^`]+)`/g,"<code>$1</code>");h=h.replace(/\*\*([^*]+)\*\*/g,"<b>$1</b>");return h;}
 function mdToHtml(md){const L=md.split("\n"),out=[];for(let i=0;i<L.length;i++){const line=L[i];
   if(line.startsWith("```")){const buf=[];i++;while(i<L.length&&!L[i].startsWith("```"))buf.push(L[i++]);out.push("<pre>"+esc(buf.join("\n"))+"</pre>");continue;}
   const hh=line.match(/^(#{1,4})\s+(.*)$/);if(hh){const n=Math.min(hh[1].length,2);out.push("<h"+n+">"+mdInline(hh[2])+"</h"+n+">");continue;}

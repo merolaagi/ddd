@@ -44,28 +44,39 @@ def interpret(ctx, genes, disease: str = ""):
     in_graph = {r["gene"].upper(): r for r in rows}
     dis = kg._q("""
         match (n:Gene)-[:REL]-(d:Disease) where n.name in $names
-        return d.name as disease, count(distinct n) as genes order by genes desc limit 12""", names=syms)
+        return d.name as disease, count(distinct n) as n, collect(distinct n.name) as genes
+        order by n desc limit 12""", names=syms)
     pw = kg._q("""
         match (n:Gene)-[:REL]-(p:Pathway) where n.name in $names
-        return p.name as pathway, count(distinct n) as genes order by genes desc limit 12""", names=syms)
+        return p.name as pathway, count(distinct n) as n, collect(distinct n.name) as genes
+        order by n desc limit 12""", names=syms)
 
     covered = len(in_graph)
     druggable = sorted([r for r in rows if r["drugs"] > 0], key=lambda r: r["drugs"], reverse=True)
+
+    # clickable-entity markup the report viewers understand: [name](ddd:kind).
+    # kind picks the drill-in action (gene→readiness, disease→targets, pathway→papers).
+    def ent(kind, name):
+        return f"[{name}](ddd:{kind})"
+
+    def genes_cell(gl):
+        return ", ".join(ent("gene", g) for g in gl) or "—"
 
     lines = ["# DEG / gene-set interpretation", "",
              f"{len(syms)} genes submitted · {covered} found in PrimeKG"
              + (f" · context: {disease}" if disease else ""), "",
              "## What the set maps to", "",
-             "Diseases most connected to your gene set — how many of your genes link to each.", "",
-             "| Disease | Your genes linked |", "|---|---|"]
-    lines += [f"| {d['disease']} | {d['genes']} |" for d in dis] or ["| — | — |"]
-    lines += ["", "Pathways most connected:", "", "| Pathway | Your genes linked |", "|---|---|"]
-    lines += [f"| {p['pathway']} | {p['genes']} |" for p in pw] or ["| — | — |"]
+             "Diseases most connected to your gene set — the actual genes of yours that link to each "
+             "(click any gene, disease or pathway to dig in).", "",
+             "| Disease | Your genes that link |", "|---|---|"]
+    lines += [f"| {ent('disease', d['disease'])} | {genes_cell(d['genes'])} |" for d in dis] or ["| — | — |"]
+    lines += ["", "Pathways most connected:", "", "| Pathway | Your genes that link |", "|---|---|"]
+    lines += [f"| {ent('pathway', p['pathway'])} | {genes_cell(p['genes'])} |" for p in pw] or ["| — | — |"]
     lines += ["", "## Druggable genes in the set", "",
               "Genes in your set that already have drugs in the graph — the actionable ones.", "",
               "| Gene | Disease links | Drug links | Phenotype links |", "|---|---|---|---|"]
     for r in druggable[:20]:
-        lines.append(f"| {r['gene']} | {r['diseases']} | {r['drugs']} | {r['phenotypes']} |")
+        lines.append(f"| {ent('gene', r['gene'])} | {r['diseases']} | {r['drugs']} | {r['phenotypes']} |")
     if not druggable:
         lines.append("| none found | | | |")
     missing = [g for g in syms if g not in in_graph]

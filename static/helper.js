@@ -20,6 +20,8 @@
   };
   function mdInline(t) {
     var h = esc(t);
+    h = h.replace(/\[([^\]]+)\]\(ddd:(gene|disease|pathway|target|mol)\)/g,
+      '<a class="ddh-ent" data-kind="$2" onclick="window.dddEntity&&window.dddEntity(\'$2\', this.textContent)">$1</a>');
     h = h.replace(/`([^`]+)`/g, "<code>$1</code>");
     h = h.replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>");
     h = h.replace(/\[([^\]]+)\]\((https?:[^)]+|\/[^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
@@ -91,6 +93,8 @@
 '.ddh-turn.bot .b th,.ddh-turn.bot .b td{border-bottom:1px solid var(--line,#e6e6e3);padding:5px 7px;text-align:left;vertical-align:top}' +
 '.ddh-turn.bot .b th{color:var(--muted,#6e6e6e);font-weight:600}' +
 '.ddh-turn.bot .b a{color:var(--accent,#b07a1e)}' +
+'.ddh-ent{color:var(--accent,#b07a1e);cursor:pointer;border-bottom:1px dotted var(--accent,#b07a1e);white-space:nowrap}' +
+'.ddh-ent:hover{background:var(--sel-bg,#f7e9cc);border-radius:3px}' +
 '.ddh-acts{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}' +
 '.ddh-chip{font:500 12px Inter,sans-serif;padding:6px 10px;border-radius:14px;cursor:pointer;' +
   'background:transparent;color:var(--ink,#262626);border:1px solid var(--line,#d9d9d6)}' +
@@ -251,6 +255,21 @@
   sendBtn.addEventListener("click", function () { send(); });
   qEl.addEventListener("input", function () { qEl.style.height = "auto"; qEl.style.height = Math.min(qEl.scrollHeight, 110) + "px"; });
   qEl.addEventListener("keydown", function (e) { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } });
+
+  // open the panel and ask a question from anywhere on the page
+  window.dddAsk = function (t) { openPanel(); send(t); };
+  // a clicked entity in a report → the right drill-in question
+  window.dddEntity = function (kind, name) {
+    name = (name || "").trim();
+    var map = {
+      gene: "Is " + name + " worth pursuing?",
+      target: "Is " + name + " worth pursuing?",
+      disease: "Targets for " + name,
+      pathway: "Literature on " + name,
+      mol: "Describe " + name
+    };
+    window.dddAsk(map[kind] || name);
+  };
 
   try { if (localStorage.getItem("ddh-open") === "1") openPanel(); } catch (e) {}
 })();
