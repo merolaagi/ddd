@@ -198,7 +198,7 @@ def swarm_configure(enabled: bool | None = None, batch_per_tick: int | None = No
                     target_inflight: int | None = None, max_dynamic_agents: int | None = None,
                     escalate_leads: bool | None = None, escalate_findings: bool | None = None,
                     email_alerts: bool | None = None, explore_world: bool | None = None,
-                    world_batch: int | None = None) -> dict:
+                    world_batch: int | None = None, world_reserve: int | None = None) -> dict:
     """Tune the swarm (persists to the charter): turn it on/off, set how many runs it
     dispatches per tick and keeps in flight, cap dynamic agents, choose what escalates
     (leads and/or notable findings) and whether to email, and control world exploration
@@ -209,7 +209,7 @@ def swarm_configure(enabled: bool | None = None, batch_per_tick: int | None = No
                            target_inflight=target_inflight, max_dynamic_agents=max_dynamic_agents,
                            escalate_leads=escalate_leads, escalate_findings=escalate_findings,
                            email_alerts=email_alerts, explore_world=explore_world,
-                           world_batch=world_batch)
+                           world_batch=world_batch, world_reserve=world_reserve)
 
 
 @mcp.tool()

@@ -339,6 +339,7 @@ class SwarmCfgReq(BaseModel):
     target_inflight: int | None = None
     explore_world: bool | None = None
     world_batch: int | None = None
+    world_reserve: int | None = None
 
 
 @app.post("/api/swarm/configure")

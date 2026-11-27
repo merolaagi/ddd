@@ -40,10 +40,10 @@ DEFAULT = {
     ],
     "focus_diseases": ["idiopathic pulmonary fibrosis", "type 2 diabetes mellitus", "Alzheimer disease"],
     "swarm": {
-        "enabled": True, "batch_per_tick": 1, "target_inflight": 1, "max_dynamic_agents": 12,
+        "enabled": True, "batch_per_tick": 1, "target_inflight": 3, "max_dynamic_agents": 12,
         "escalate_leads": True, "escalate_findings": True, "email_alerts": True,
         "baseline_worker": "discovery_mission",
-        "explore_world": True, "world_batch": 3, "max_world_topics": 300,
+        "explore_world": True, "world_batch": 3, "world_reserve": 1, "max_world_topics": 300,
     },
 }
 

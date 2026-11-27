@@ -37,7 +37,7 @@ _STATE = COMPANY_DIR / "swarm.json"
 _DEFAULT_CFG = {
     "enabled": True,
     "batch_per_tick": 1,        # new runs dispatched per tick
-    "target_inflight": 1,       # keep this many tasks pending+running
+    "target_inflight": 3,       # keep this many tasks pending+running
     "max_dynamic_agents": 12,
     "escalate_leads": True,
     "escalate_findings": True,
@@ -45,6 +45,7 @@ _DEFAULT_CFG = {
     "baseline_worker": "discovery_mission",
     "explore_world": True,      # go beyond focus_diseases: mine fresh topics from papers
     "world_batch": 3,           # fresh diseases to pick up per world scout
+    "world_reserve": 1,         # in-flight slots always kept for world exploration
     "max_world_topics": 300,    # cap on remembered discovered topics
 }
 
@@ -338,11 +339,16 @@ def tick(ctx, max_dispatch: int | None = None):
     inflight = len([t for t in s["queue"] if t["status"] in ("pending", "running")])
     bw = cfg["baseline_worker"]
     target = cfg["target_inflight"]
+    explore = cfg.get("explore_world", True)
+    # reserve a slot (or more) for the world so a full focus list can't starve the
+    # scout; never take the last focus slot away when there are focus diseases.
+    reserve = min(int(cfg.get("world_reserve", 1)), max(0, target - 1)) if explore else 0
+    focus_cap = target - reserve
 
-    # 2a) keep the charter's focus diseases covered
-    if inflight < target:
+    # 2a) keep the charter's focus diseases covered (up to the focus budget)
+    if inflight < focus_cap:
         for disease in charter_mod.load().get("focus_diseases", []):
-            if inflight >= target:
+            if inflight >= focus_cap:
                 break
             if (bw, disease) in foci:
                 continue
@@ -351,7 +357,7 @@ def tick(ctx, max_dispatch: int | None = None):
             inflight += 1
 
     # 2b) go beyond the fixed list — work the topics scouted from the world's papers
-    if cfg.get("explore_world", True) and inflight < target:
+    if explore and inflight < target:
         pending_topics = [d for d in s["discovered"] if not d.get("worked")]
         if not pending_topics:
             try:
