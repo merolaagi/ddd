@@ -337,6 +337,8 @@ class SwarmCfgReq(BaseModel):
     escalate_findings: bool | None = None
     email_alerts: bool | None = None
     target_inflight: int | None = None
+    explore_world: bool | None = None
+    world_batch: int | None = None
 
 
 @app.post("/api/swarm/configure")

@@ -11,7 +11,7 @@ from __future__ import annotations
 import re
 
 from . import kg, kg_model
-from .company import engine
+from .company import engine, mission_control
 from .sources import literature
 
 _VIRUS = re.compile(r"\b(viral|virus|influenza|flu|covid|sars|sars-cov-2|rsv|rhinovirus|parainfluenza|coronavirus)\b", re.I)
@@ -84,8 +84,33 @@ def handle(q: str, choice: str | None = None, pending: dict | None = None) -> di
         return {"kind": "answer", "say": HELP}
 
     if not q:
-        return {"kind": "answer", "say": HELP}
+        return mission_control.guide("")
     ql = q.lower()
+
+    # ---- swarm tick (a mission-control action) ----
+    if re.search(r"\b(run|do|trigger|fire|kick)\b.{0,14}\bswarm\b.{0,8}\btick\b|\btick the swarm\b", ql):
+        try:
+            from .company import swarm
+
+            class _C:
+                def log(self, *a):
+                    pass
+
+            summary, _ = swarm.tick(_C())
+            return {"kind": "guide",
+                    "say": "Ran a swarm tick. "
+                           f"Harvested **{summary.get('harvested', 0)}**, dispatched **{summary.get('dispatched', 0)}**, "
+                           f"escalated **{summary.get('escalated', 0)}**, spawned **{summary.get('spawned', 0)}** agent(s). "
+                           f"World topics known: **{summary.get('world_topics', 0)}** "
+                           f"({summary.get('world_unworked', 0)} not yet worked).",
+                    "actions": [{"label": "What's happening right now?", "ask": "What's happening right now?"},
+                                {"label": "What has the world scout found?", "ask": "What has the world scout found?"}]}
+        except Exception as e:
+            return {"kind": "answer", "say": f"Couldn't tick the swarm: {str(e)[:160]}"}
+
+    # ---- mission control (explain the app, live status, world scout, inbox, next steps) ----
+    if mission_control.matches(ql):
+        return mission_control.guide(q)
 
     # ---- program plan ----
     if re.search(r"\bprogram plan\b|\bplan a program\b|\bdevelop a (drug|therapy|program|treatment)\b|how (would|do) i develop", ql):

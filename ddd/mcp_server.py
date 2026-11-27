@@ -197,15 +197,33 @@ def swarm_tick(max_dispatch: int = 1) -> dict:
 def swarm_configure(enabled: bool | None = None, batch_per_tick: int | None = None,
                     target_inflight: int | None = None, max_dynamic_agents: int | None = None,
                     escalate_leads: bool | None = None, escalate_findings: bool | None = None,
-                    email_alerts: bool | None = None) -> dict:
+                    email_alerts: bool | None = None, explore_world: bool | None = None,
+                    world_batch: int | None = None) -> dict:
     """Tune the swarm (persists to the charter): turn it on/off, set how many runs it
-    dispatches per tick and keeps in flight, cap dynamic agents, and choose what
-    escalates (leads and/or notable findings) and whether to email. Returns the new config."""
+    dispatches per tick and keeps in flight, cap dynamic agents, choose what escalates
+    (leads and/or notable findings) and whether to email, and control world exploration
+    (explore_world = go beyond the focus diseases by mining fresh topics from recent
+    papers; world_batch = how many to pick up per scout). Returns the new config."""
     from .company import swarm
     return swarm.configure(enabled=enabled, batch_per_tick=batch_per_tick,
                            target_inflight=target_inflight, max_dynamic_agents=max_dynamic_agents,
                            escalate_leads=escalate_leads, escalate_findings=escalate_findings,
-                           email_alerts=email_alerts)
+                           email_alerts=email_alerts, explore_world=explore_world,
+                           world_batch=world_batch)
+
+
+@mcp.tool()
+def ask_ddd(question: str) -> dict:
+    """Ask ddd in plain language — the mission-control concierge / overall helper.
+    It explains what the app can do, reports what the swarm and the world scout are
+    doing right now, lists what's been discovered from the literature or escalated to
+    your inbox, and recommends what to do next. For a science request it starts the
+    right playbook and returns a run_id to poll with company_run_status. Examples:
+    "what's happening right now?", "what has the world scout found?",
+    "what should I do next?", "is TYK2 worth pursuing?",
+    "find me a drug for pancreatic cancer"."""
+    from .analyst import handle
+    return handle(question)
 
 
 @mcp.tool()

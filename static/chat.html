@@ -120,7 +120,7 @@ header nav a:hover{color:var(--ink)}
 .ovl .md{font-size:14px;line-height:1.5;margin-top:10px;border-top:1px solid var(--line);padding-top:14px}
 </style>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/ink-skin.css?v=0.38.0">
+<link rel="stylesheet" href="/static/ink-skin.css?v=0.40.0">
 </head>
 <body>
 <header>
@@ -134,8 +134,8 @@ header nav a:hover{color:var(--ink)}
   <div class="col" id="col">
     <div class="hero" id="hero">
       <div class="mark"><b>ddd</b></div>
-      <h1>What should the company look into?</h1>
-      <p>Ask in plain language. I'll plan it, ask if I need to, run the right analysis across the company, and interpret the result.</p>
+      <h1>Mission control — ask ddd anything</h1>
+      <p>I run the right analysis, and I'm also your guide: ask what the app can do, what the agents and the world scout are doing right now, or what you should do next.</p>
       <div class="chips" id="chips"></div>
     </div>
   </div>
@@ -166,7 +166,7 @@ function mdToHtml(md){const L=md.split("\n"),out=[];for(let i=0;i<L.length;i++){
   if(line.trim())out.push("<p>"+mdInline(line)+"</p>");}
   return out.join("\n");}
 
-const SUGG=["Design novel molecules for EGFR","Repurposing candidates for rheumatoid arthritis","Program plan for LAMA2 muscular dystrophy","Is TERT linked to idiopathic pulmonary fibrosis?","Novel targets for lung cancer","Build a cell for psoriasis"];
+const SUGG=["What can this app do?","What's happening right now?","What has the world scout found?","What should I do next?","Design novel molecules for EGFR","Repurposing candidates for rheumatoid arthritis"];
 document.getElementById("chips").innerHTML=SUGG.map(s=>'<button class="chip" onclick="go(this.textContent)">'+esc(s)+'</button>').join("");
 
 const col=document.getElementById("col"),scroll=document.getElementById("scroll");
@@ -198,8 +198,10 @@ async function choose(choice){
   catch(e){bot.querySelector(".body").innerHTML='<span class="err">'+esc(e.message)+'</span>';}
 }
 function planHtml(p){return (p&&p.length)?'<div class="plan"><div class="plan-h">PLAN</div>'+p.map((s,i)=>'<div class="plan-s"><span class="n">'+(i+1)+'</span>'+esc(s)+'</div>').join("")+'</div>':"";}
+function actsHtml(a){return (a&&a.length)?'<div class="acts" style="margin-top:11px;display:flex;flex-wrap:wrap;gap:7px">'+a.map(x=>'<button class="chip" data-ask="'+esc(x.ask)+'" onclick="go(this.dataset.ask)">'+esc(x.label)+'</button>').join("")+'</div>':"";}
 function render(bot,r,q){
   var el=bot.querySelector(".body");
+  if(r.kind==="guide"){el.innerHTML=mdToHtml(r.say)+planHtml(r.plan)+actsHtml(r.actions);toBottom();return;}
   if(r.kind==="clarify"){LAST_CLARIFY={pending:r.pending,q:q};
     el.innerHTML=mdInline(r.say)+'<div class="opts">'+r.options.map(o=>'<button class="opt" onclick="choose(\''+o.value.replace(/'/g,"\\'")+'\')">'+esc(o.label)+'</button>').join("")+'</div>';toBottom();return;}
   if(r.kind==="answer"){el.innerHTML=mdInline(r.say);toBottom();return;}
