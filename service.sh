@@ -57,8 +57,11 @@ _boot() {
 
 _wait_up() {
   echo "Waiting for startup (first start compiles RDKit, ~20s)..."
+  local web=0 mcp=0
   for i in $(seq 1 90); do
-    curl -fs "http://127.0.0.1:$WEB_PORT/healthz" >/dev/null 2>&1 && return 0
+    [ "$web" = 0 ] && curl -fs "http://127.0.0.1:$WEB_PORT/healthz" >/dev/null 2>&1 && web=1
+    [ "$mcp" = 0 ] && lsof -ti tcp:"$MCP_PORT" -sTCP:LISTEN >/dev/null 2>&1 && mcp=1
+    [ "$web" = 1 ] && [ "$mcp" = 1 ] && return 0
     sleep 1
   done
   return 1

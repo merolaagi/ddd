@@ -69,7 +69,11 @@ _DISEASE_STOP = {"disease", "diseases", "disorder", "disorders", "syndrome", "sy
                  "tumours", "neoplasm", "neoplasms", "malignancy", "malignancies", "carcinoma",
                  "infection", "infections", "inflammation", "fibrosis", "sclerosis", "failure",
                  "cancer", "cancers", "fever", "bleeding", "edema", "necrosis", "sepsis",
-                 "comorbidity", "comorbidities", "mortality", "morbidity", "relapse", "metastasis"}
+                 "comorbidity", "comorbidities", "mortality", "morbidity", "relapse", "metastasis",
+                 "mass", "masses", "primary", "secondary", "neoplastic", "malignant", "benign",
+                 "metastatic", "recurrent", "growth", "growths", "unspecified", "susceptibility",
+                 "infestation", "infestations", "nos", "stage", "grade", "chronic", "acute"}
+_CONNECT = {"and", "or", "of", "the", "to", "with", "in", "a", "an", "non", "due"}
 
 # recent, broad "go out into the world" queries — each scout sweeps a different slice
 _WORLD_QUERIES = [
@@ -91,7 +95,25 @@ def _plausible_disease(name: str) -> bool:
         return False
     if re.fullmatch(r"[\d\W]+", n):
         return False
-    # a bare single generic word is usually too broad; keep specific or multiword names
+    # reject category labels where every content word is generic ("tumor mass",
+    # "malignant neoplastic primary", "infestations and infections"): a real disease
+    # name carries at least one specific token.
+    toks = [t for t in re.split(r"[\s/,\-]+", low) if t and t not in _CONNECT]
+    if not toks or all(t in _DISEASE_STOP for t in toks):
+        return False
+    return True
+
+
+def _gene_symbol(name: str) -> bool:
+    """Strict gene-symbol check for world-scouted targets (they feed target_intel,
+    which resolves by symbol): a single token like EGFR/TYK2, no spaces, no phrases."""
+    n = (name or "").strip()
+    if " " in n or n.lower() in _STOP:
+        return False
+    if not re.fullmatch(r"[A-Za-z][A-Za-z0-9]{1,8}", n):
+        return False
+    if re.search(r"\d{3,}", n):
+        return False
     return True
 
 
@@ -124,7 +146,7 @@ def scout_world(cursor: int = 0, want: int = 3, exclude=(), limit_papers: int = 
     for g in ann.get("gene_proteins", []):
         nm = g["name"].strip()
         low = nm.lower()
-        if low in seen_t or not _plausible_target(nm) or g["papers"] < 2:
+        if low in seen_t or not _gene_symbol(nm) or g["papers"] < 2:
             continue
         seen_t.add(low)
         targets.append(nm)
